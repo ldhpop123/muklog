@@ -1,9 +1,27 @@
+import 'dart:math' as math;
+
 import 'taste_vector.dart';
 
 class LatLng {
   const LatLng(this.lat, this.lng);
   final double lat;
   final double lng;
+
+  /// 두 좌표 사이 거리(km). 하버사인 (서버 taste.distance_km과 같은 식).
+  double distanceKm(LatLng other) {
+    const r = 6371.0;
+    double rad(double d) => d * math.pi / 180;
+    final dLat = rad(other.lat - lat), dLng = rad(other.lng - lng);
+    final h = math.pow(math.sin(dLat / 2), 2) +
+        math.cos(rad(lat)) * math.cos(rad(other.lat)) * math.pow(math.sin(dLng / 2), 2);
+    return 2 * r * math.asin(math.sqrt(h));
+  }
+
+  @override
+  bool operator ==(Object other) => other is LatLng && other.lat == lat && other.lng == lng;
+
+  @override
+  int get hashCode => Object.hash(lat, lng);
 }
 
 class Place {

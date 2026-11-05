@@ -15,10 +15,17 @@ abstract class MuklogRepository {
   Future<List<UserProfile>> friends();
 
   /// tags: 하나라도 가진 식당. layer: 친구/내 기록이 있는 곳만.
-  Future<List<Place>> places(
-      {List<String> tags = const [], MapLayer layer = MapLayer.all});
+  /// near: 주면 그 지점에서 [radiusKm] 안의 식당만.
+  Future<List<Place>> places({
+    List<String> tags = const [],
+    MapLayer layer = MapLayer.all,
+    LatLng? near,
+    double radiusKm = 3,
+  });
   Future<List<VisitRecord>> recordsForPlace(String placeId);
-  Future<List<ScoredPlace>> recommend();
+
+  /// near: 주면 가까울수록 점수를 더 주고 추천 이유에 거리를 붙인다 (README 6.4 Context 보정).
+  Future<List<ScoredPlace>> recommend({LatLng? near});
   Future<List<ScoredPlace>> partyRecommend(List<String> memberIds);
   Future<void> saveOnboarding(TasteVector taste);
 

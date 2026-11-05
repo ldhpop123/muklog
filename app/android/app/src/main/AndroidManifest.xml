@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 지도 타일·친구 사진·API 통신 (release 빌드에도 필요) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 현재 위치 기준으로 근처 친구 기록을 보여 준다 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="먹로그"
         android:name="${applicationName}"

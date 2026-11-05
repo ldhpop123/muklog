@@ -16,6 +16,9 @@ abstract final class Palette {
   // 숯불 주황. 흰 글씨 대비 4.5:1 이상
   static const ember = Color(0xFFC2461A);
 
+  // 내 위치 점. 지도 앱에서 익숙한 파란 점을 그대로 쓴다 (이 의미로만 사용)
+  static const myLocation = Color(0xFF2F6FEB);
+
   // 지도 바탕 (임시 지도)
   static const mapPaper = Color(0xFFF1EADF);
   static const mapStreet = Color(0xFFE5DBCC);

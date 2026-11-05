@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/location.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/muklog_repository.dart';
@@ -31,8 +32,9 @@ final briefingAreaProvider =
 final mapPinsProvider = FutureProvider<List<MukMapPin>>((ref) async {
   final repo = ref.watch(repositoryProvider);
   final filter = ref.watch(mapFilterProvider);
-  final places =
-      await repo.places(tags: filter.tags.toList(), layer: filter.layer);
+  final near = await ref.watch(searchCenterProvider.future);
+  final places = await repo.places(
+      tags: filter.tags.toList(), layer: filter.layer, near: near, radiusKm: nearbyRadiusKm);
   final me = await ref.watch(meProvider.future);
   final authors = {
     for (final f in await ref.watch(friendsProvider.future)) f.id: f,
@@ -77,15 +79,49 @@ class MapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pins = ref.watch(mapPinsProvider);
+    final location = ref.watch(myLocationProvider).valueOrNull;
+    final nearMe = ref.watch(nearMeProvider);
+    final me = location?.position;
+    // 내 주변 보기면 내 위치, 전체 보기면 친구 기록이 모인 곳(홍대)을 가운데에 둔다.
+    final center = nearMe && me != null ? me : defaultMapCenter;
     final wide = isWide(context);
     final map = Stack(children: [
       pins.when(
-        data: (pins) =>
-            MukMap(pins: pins, onPinTap: (id) => context.push('/place/$id')),
+        data: (pins) => MukMap(
+          pins: pins,
+          onPinTap: (id) => context.push('/place/$id'),
+          me: me,
+          center: center,
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('지도를 불러오지 못했어요. $e')),
       ),
       const Positioned(top: 8, left: 0, right: 0, child: _FilterBar()),
+      Positioned(
+        top: 56,
+        left: 12,
+        right: 12,
+        child: _LocationBanner(
+          location: location,
+          nearMe: nearMe,
+          empty: pins.valueOrNull?.isEmpty ?? false,
+        ),
+      ),
+      Positioned(
+        right: 12,
+        bottom: wide ? 24 : MediaQuery.sizeOf(context).height * 0.32 + 12,
+        child: FloatingActionButton.small(
+          heroTag: 'my-location',
+          tooltip: '내 위치',
+          backgroundColor: Palette.card,
+          foregroundColor: Palette.ink,
+          onPressed: () {
+            ref.read(nearMeProvider.notifier).state = true;
+            ref.invalidate(myLocationProvider);
+          },
+          child: const Icon(Icons.my_location, size: 20),
+        ),
+      ),
       if (!wide) const _RecommendSheet(wide: false),
     ]);
     return Scaffold(
@@ -97,6 +133,59 @@ class MapScreen extends ConsumerWidget {
               const SizedBox(width: 400, child: _RecommendSheet(wide: true)),
             ])
           : map,
+    );
+  }
+}
+
+/// 위치 상태 안내: 위치를 못 가져왔거나, 내 주변에 친구 기록이 없을 때만 보인다.
+class _LocationBanner extends ConsumerWidget {
+  const _LocationBanner({required this.location, required this.nearMe, required this.empty});
+
+  final MyLocation? location;
+  final bool nearMe;
+  final bool empty;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = Theme.of(context).textTheme;
+    String? message;
+    String? action;
+    VoidCallback? onAction;
+    if (location != null && location!.position == null) {
+      message = '${location!.reason} · 홍대 기준으로 보여 드려요';
+    } else if (location != null && nearMe && empty) {
+      message = '내 주변 ${nearbyRadiusKm.toStringAsFixed(0)}km 안에 친구 기록이 없어요';
+      action = '전체 보기';
+      onAction = () => ref.read(nearMeProvider.notifier).state = false;
+    } else if (!nearMe) {
+      message = '친구 기록 전체를 보고 있어요';
+      action = '내 주변';
+      onAction = () => ref.read(nearMeProvider.notifier).state = true;
+    }
+    if (message == null) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: Palette.card,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Palette.hairline),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.near_me_outlined, size: 16, color: Palette.inkMuted),
+          const SizedBox(width: 8),
+          Flexible(child: Text(message, style: text.bodyMedium)),
+          if (action != null)
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(foregroundColor: Palette.ember),
+              child: Text(action),
+            )
+          else
+            const SizedBox(width: 8, height: 36),
+        ]),
+      ),
     );
   }
 }

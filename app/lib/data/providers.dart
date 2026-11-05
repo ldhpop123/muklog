@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
+import '../core/location.dart';
 import '../models/place.dart';
 import '../models/social.dart';
 import '../models/user_profile.dart';
@@ -29,8 +30,10 @@ final friendsProvider = FutureProvider<List<UserProfile>>(
 final placesProvider = FutureProvider<List<Place>>(
     (ref) => ref.watch(repositoryProvider).places());
 
-final recommendProvider = FutureProvider<List<ScoredPlace>>(
-    (ref) => ref.watch(repositoryProvider).recommend());
+final recommendProvider = FutureProvider<List<ScoredPlace>>((ref) async {
+  final near = await ref.watch(searchCenterProvider.future);
+  return ref.watch(repositoryProvider).recommend(near: near);
+});
 
 final dislikesProvider = FutureProvider<List<Dislike>>(
     (ref) => ref.watch(repositoryProvider).dislikes());

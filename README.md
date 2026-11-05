@@ -580,6 +580,7 @@ flutter run -d chrome                 # 웹 (목 데이터)
 flutter run                           # 연결된 기기·시뮬레이터
 flutter run -d chrome --dart-define=USE_MOCK=false --dart-define=API_BASE_URL=http://localhost:8010
 flutter run -d chrome --dart-define=NAVER_MAP_CLIENT_ID=발급받은_Client_ID   # 실제 네이버 지도
+flutter run -d chrome --dart-define-from-file=.env    # app/.env 에 적은 값 사용 (.env.example 참고)
 ```
 
 - 기본값은 `USE_MOCK=true`로, 서버 없이 목 데이터로 동작합니다.

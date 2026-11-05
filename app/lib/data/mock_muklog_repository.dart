@@ -198,8 +198,12 @@ class MockMuklogRepository implements MuklogRepository {
   Future<List<UserProfile>> friends() async => _friends;
 
   @override
-  Future<List<Place>> places(
-      {List<String> tags = const [], MapLayer layer = MapLayer.all}) async {
+  Future<List<Place>> places({
+    List<String> tags = const [],
+    MapLayer layer = MapLayer.all,
+    LatLng? near,
+    double radiusKm = 3,
+  }) async {
     final authors = switch (layer) {
       MapLayer.all => null,
       MapLayer.friends => _friends.map((f) => f.id).toSet(),
@@ -214,6 +218,7 @@ class MockMuklogRepository implements MuklogRepository {
     return _places
         .where((p) => tags.isEmpty || p.tags.any(tags.contains))
         .where((p) => allowed == null || allowed.contains(p.id))
+        .where((p) => near == null || p.location.distanceKm(near) <= radiusKm)
         .toList();
   }
 
@@ -222,8 +227,8 @@ class MockMuklogRepository implements MuklogRepository {
       _visible.where((r) => r.placeId == placeId).toList();
 
   @override
-  Future<List<ScoredPlace>> recommend() async {
-    // README 6.4의 Score(u, i)를 단순화한 계산 (Context 보정 생략). 내 불호 식당은 뺀다.
+  Future<List<ScoredPlace>> recommend({LatLng? near}) async {
+    // README 6.4의 Score(u, i). Context 보정은 서버와 같은 거리 감쇠(1.5km에서 절반). 내 불호 식당은 뺀다.
     final mine = _dislikes[_me.id] ?? const [];
     final scored = _places.where((p) => !_excluded(p, mine)).map((p) {
       var friendSignal = 0.0;
@@ -237,8 +242,15 @@ class MockMuklogRepository implements MuklogRepository {
         reason ??=
             '${f.nickname}님(입맛 ${_me.taste.couplePercent(f.taste)}%)이 ${r.visitNo}번 방문';
       }
-      final score =
-          _me.taste.cosine(p.taste) * (1 + math.log(1 + friendSignal));
+      final km = near == null ? null : p.location.distanceKm(near);
+      if (km != null) {
+        final d = '${km.toStringAsFixed(1)}km';
+        reason = reason == null ? d : '$reason · $d';
+      }
+      final context = km == null ? 1.0 : 1 / (1 + km / 1.5);
+      final score = _me.taste.cosine(p.taste) *
+          (1 + math.log(1 + friendSignal)) *
+          context;
       return ScoredPlace(p, score, reason: reason);
     }).toList()
       ..sort((a, b) => b.score.compareTo(a.score));

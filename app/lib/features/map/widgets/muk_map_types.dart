@@ -23,4 +23,5 @@ typedef PinTapCallback = void Function(String placeId);
 
 /// 지도 첫 화면 중심 (홍대입구역).
 const defaultMapCenter = LatLng(37.5572, 126.9245);
-const defaultMapZoom = 15.0;
+/// 반경 3km 안의 핀이 폰 화면에 대체로 들어오는 줌 레벨
+const defaultMapZoom = 14.0;

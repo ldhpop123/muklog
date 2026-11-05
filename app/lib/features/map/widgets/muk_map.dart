@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../../../models/place.dart';
 import 'muk_map_types.dart';
 import 'muk_map_stub.dart'
     if (dart.library.io) 'muk_map_mobile.dart'
@@ -17,12 +18,23 @@ Future<void> initMukMap() => platform.initMapSdk();
 /// - Web: `muk_map_web.dart` (네이버 지도 JavaScript SDK + HtmlElementView)
 /// NAVER_MAP_CLIENT_ID가 없으면 양쪽 모두 임시 지도(PreviewMap)를 쓴다.
 class MukMap extends StatelessWidget {
-  const MukMap({super.key, required this.pins, required this.onPinTap});
+  const MukMap({
+    super.key,
+    required this.pins,
+    required this.onPinTap,
+    required this.center,
+    this.me,
+  });
 
   final List<MukMapPin> pins;
   final PinTapCallback onPinTap;
 
+  /// 지도 가운데. 내 주변 보기면 내 위치.
+  final LatLng center;
+
+  /// 내 현재 위치. 있으면 지도에 내 위치 점을 찍는다.
+  final LatLng? me;
+
   @override
-  Widget build(BuildContext context) =>
-      platform.buildPlatformMap(pins, onPinTap);
+  Widget build(BuildContext context) => platform.buildPlatformMap(pins, onPinTap, center, me);
 }

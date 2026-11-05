@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dio/dio.dart';
 
 import '../models/place.dart';
@@ -58,15 +60,30 @@ class ApiMuklogRepository implements MuklogRepository {
       (await _getList('/users/me/friends')).map(UserProfile.fromJson).toList();
 
   @override
-  Future<List<Place>> places(
-          {List<String> tags = const [],
-          MapLayer layer = MapLayer.all}) async =>
-      (await _getList('/places', query: {
-        if (tags.isNotEmpty) 'tags': tags,
-        'layer': layer.name,
-      }))
-          .map(Place.fromJson)
-          .toList();
+  Future<List<Place>> places({
+    List<String> tags = const [],
+    MapLayer layer = MapLayer.all,
+    LatLng? near,
+    double radiusKm = 3,
+  }) async {
+    String? bbox;
+    if (near != null) {
+      // 반경을 감싸는 사각형. 위도 1도 ≈ 111km
+      final dLat = radiusKm / 111;
+      final dLng = radiusKm / (111 * math.cos(near.lat * math.pi / 180));
+      bbox = [near.lat - dLat, near.lng - dLng, near.lat + dLat, near.lng + dLng].join(',');
+    }
+    final rows = await _getList('/places', query: {
+      if (tags.isNotEmpty) 'tags': tags,
+      'layer': layer.name,
+      if (bbox != null) 'bbox': bbox,
+    });
+    final places = rows.map(Place.fromJson);
+    // 사각형 모서리 쪽을 잘라 원형 반경으로 맞춘다.
+    return near == null
+        ? places.toList()
+        : places.where((p) => p.location.distanceKm(near) <= radiusKm).toList();
+  }
 
   @override
   Future<List<VisitRecord>> recordsForPlace(String placeId) async =>
@@ -75,8 +92,9 @@ class ApiMuklogRepository implements MuklogRepository {
           .toList();
 
   @override
-  Future<List<ScoredPlace>> recommend() async =>
-      _scored(await _getList('/recommend'));
+  Future<List<ScoredPlace>> recommend({LatLng? near}) async =>
+      _scored(await _getList('/recommend',
+          query: near == null ? null : {'lat': near.lat, 'lng': near.lng}));
 
   @override
   Future<List<ScoredPlace>> partyRecommend(List<String> memberIds) =>
