@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/pubspec.lock.bak
+*.iml
+.idea/
+
+# Python
+server/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 비밀 값
+.env
+.playwright-mcp/

@@ -1,0 +1,24 @@
+name: muklog
+description: 먹로그 - 친구 기반 소셜 미식 지도
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.6.0
+  dio: ^5.7.0
+  flutter_naver_map: ^1.4.4
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
