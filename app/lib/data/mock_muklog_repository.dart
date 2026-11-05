@@ -65,7 +65,7 @@ class MockMuklogRepository implements MuklogRepository {
     ),
   ];
 
-  final _places = const [
+  final _places = <Place>[
     Place(
       id: 'p1',
       name: '서교 순댓국',
@@ -309,6 +309,7 @@ class MockMuklogRepository implements MuklogRepository {
       tags: record.tags,
       visibility: record.visibility,
       inspiredByRecordId: record.inspiredByRecordId,
+      photoUrls: record.photoUrls,
     ));
   }
 
@@ -346,12 +347,30 @@ class MockMuklogRepository implements MuklogRepository {
   }
 
   @override
+  Future<List<AreaInfo>> nearbyAreas(LatLng center, {int limit = 5}) async {
+    final areas = [
+      for (final e in _areaCenters.entries)
+        AreaInfo(
+          name: e.key,
+          location: e.value,
+          distanceKm: e.value.distanceKm(center),
+          recordCount: _visible
+              .where((r) => r.userId != _me.id)
+              .where((r) => _places.firstWhere((p) => p.id == r.placeId).location.distanceKm(e.value) <= _areaRadiusKm)
+              .length,
+        ),
+    ]..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+    return areas.take(limit).toList();
+  }
+
+  @override
   Future<Briefing> briefing(String area) async {
-    if (!briefingAreas.contains(area)) {
-      throw MuklogException('지원하지 않는 지역입니다. 가능한 지역: $briefingAreas');
+    final center = _areaCenters[area];
+    if (center == null) {
+      throw MuklogException('지원하지 않는 지역입니다. 가능한 지역: ${_areaCenters.keys.toList()}');
     }
     final top = (await recommend())
-        .where((s) => s.place.area == area && s.reason != null)
+        .where((s) => s.place.location.distanceKm(center) <= _areaRadiusKm && s.reason != null)
         .take(3)
         .toList();
     if (top.isEmpty) {
@@ -393,5 +412,80 @@ class MockMuklogRepository implements MuklogRepository {
         (d.target.trim(), d.kind): Dislike(d.target.trim(), kind: d.kind),
     };
     return _dislikes[_me.id] = unique.values.toList();
+  }
+
+  // ── 식당 검색 · 등록 · 사진 (서버의 네이버 지역 검색 프록시를 흉내 낸다) ─────────────
+
+  /// 검색에 걸리는 가상의 홍대 일대 식당. 앞의 넷은 이미 먹로그에 있는 식당이다.
+  static const _catalog = [
+    PlaceCandidate(externalId: 'n-1001', name: '서교 순댓국', category: '한식>국밥', address: '서울 마포구 서교동', location: LatLng(37.5550, 126.9205), placeId: 'p1'),
+    PlaceCandidate(externalId: 'n-1002', name: '연남 마라공방', category: '중식>마라탕', address: '서울 마포구 연남동', location: LatLng(37.5612, 126.9248), placeId: 'p2'),
+    PlaceCandidate(externalId: 'n-1003', name: '홍대 골목포차', category: '술집>포장마차', address: '서울 마포구 서교동', location: LatLng(37.5534, 126.9241), placeId: 'p3'),
+    PlaceCandidate(externalId: 'n-1004', name: '상수 파스타랩', category: '양식>파스타', address: '서울 마포구 상수동', location: LatLng(37.5478, 126.9227), placeId: 'p4'),
+    PlaceCandidate(externalId: 'n-2001', name: '망원 손칼국수', category: '한식>칼국수', address: '서울 마포구 망원동', location: LatLng(37.5556, 126.9102)),
+    PlaceCandidate(externalId: 'n-2002', name: '연남 돈가스상회', category: '일식>돈가스', address: '서울 마포구 연남동', location: LatLng(37.5629, 126.9230)),
+    PlaceCandidate(externalId: 'n-2003', name: '홍대 쌀국수집', category: '아시아음식>베트남', address: '서울 마포구 동교동', location: LatLng(37.5576, 126.9257)),
+    PlaceCandidate(externalId: 'n-2004', name: '서교 순대국밥 본점', category: '한식>국밥', address: '서울 마포구 서교동', location: LatLng(37.5521, 126.9188)),
+    PlaceCandidate(externalId: 'n-2005', name: '상수 화덕피자', category: '양식>피자', address: '서울 마포구 상수동', location: LatLng(37.5482, 126.9211)),
+  ];
+
+  final _registered = <String, String>{}; // externalId → placeId (새로 등록한 식당)
+
+  @override
+  Future<List<PlaceCandidate>> searchPlaces(String query, {LatLng? near}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250)); // 네트워크 느낌
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+    final hits = _catalog
+        .where((c) => c.name.contains(q) || c.category.contains(q) || c.address.contains(q))
+        .map((c) => _registered[c.externalId] == null
+            ? c
+            : PlaceCandidate(
+                externalId: c.externalId, name: c.name, category: c.category, address: c.address,
+                location: c.location, placeId: _registered[c.externalId]))
+        .toList();
+    if (near != null) {
+      hits.sort((a, b) => a.location.distanceKm(near).compareTo(b.location.distanceKm(near)));
+    }
+    return hits.take(5).toList(); // 네이버 지역 검색은 한 번에 최대 5건
+  }
+
+  /// 목 데이터용 상권 중심 (대략적인 좌표). 실제 상권 목록과 좌표는 서버가 관리한다 (GET /areas).
+  static const _areaCenters = {
+    '홍대': LatLng(37.5560, 126.9230),
+    '연남': LatLng(37.5620, 126.9240),
+    '상수': LatLng(37.5480, 126.9220),
+    '합정': LatLng(37.5496, 126.9139),
+    '망원': LatLng(37.5563, 126.9060),
+    '신촌': LatLng(37.5552, 126.9369),
+  };
+  static const _areaRadiusKm = 0.7;
+
+  @override
+  Future<Place> createPlace(PlaceCandidate c) async {
+    final existingId = c.placeId ?? _registered[c.externalId];
+    if (existingId != null) return _places.firstWhere((p) => p.id == existingId);
+    final area = _areaCenters.entries
+        .reduce((a, b) => a.value.distanceKm(c.location) <= b.value.distanceKm(c.location) ? a : b)
+        .key;
+    final place = Place(
+      id: 'p${_places.length + 1}',
+      name: c.name,
+      location: c.location,
+      area: area,
+      category: c.category.split('>').last,
+      taste: TasteVector.zero, // 기록이 쌓이면 서버가 리뷰에서 채운다
+    );
+    _places.add(place);
+    _registered[c.externalId] = place.id;
+    return place;
+  }
+
+  @override
+  Future<String> uploadPhoto(List<int> bytes, String filename) async {
+    // 서버 없이도 사진이 보이도록 data: URL로 돌려준다.
+    final ext = filename.split('.').last.toLowerCase();
+    final mime = switch (ext) { 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif', _ => 'image/jpeg' };
+    return Uri.dataFromBytes(bytes, mimeType: mime).toString();
   }
 }

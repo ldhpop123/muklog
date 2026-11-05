@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/location.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
-import '../../data/muklog_repository.dart';
 import '../../data/providers.dart';
+import '../../models/place.dart';
 import '../../models/social.dart';
+import 'briefing_section.dart';
+import 'briefing_state.dart';
 import 'widgets/muk_map.dart';
 
 const mapTagOptions = ['노포', '아재입맛', '혼밥', '안주맛집', '데이트', '가성비', '매운맛', '감성'];
@@ -25,8 +27,6 @@ class MapFilter {
 }
 
 final mapFilterProvider = StateProvider<MapFilter>((ref) => const MapFilter());
-final briefingAreaProvider =
-    StateProvider<String>((ref) => briefingAreas.first);
 
 /// 식당마다 다녀간 친구(와 나)의 얼굴을 모은 핀 목록.
 final mapPinsProvider = FutureProvider<List<MukMapPin>>((ref) async {
@@ -92,11 +92,13 @@ class MapScreen extends ConsumerWidget {
           onPinTap: (id) => context.push('/place/$id'),
           me: me,
           center: center,
+          onCameraIdle: (c) => ref.read(mapViewCenterProvider.notifier).state = c,
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('지도를 불러오지 못했어요. $e')),
       ),
       const Positioned(top: 8, left: 0, right: 0, child: _FilterBar()),
+      Positioned(top: 104, left: 0, right: 0, child: Center(child: _BriefHereButton(fallback: center))),
       Positioned(
         top: 56,
         left: 12,
@@ -126,13 +128,69 @@ class MapScreen extends ConsumerWidget {
     ]);
     return Scaffold(
       // 넓은 화면은 왼쪽 내비게이션에 이름이 있으므로 앱바를 생략한다.
-      appBar: wide ? null : AppBar(title: const Text('먹로그')),
+      appBar: wide
+          ? null
+          : AppBar(title: const Text('먹로그'), actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: FilledButton.icon(
+                  onPressed: () => context.push('/record/search'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 12)),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('다녀왔어요'),
+                ),
+              ),
+            ]),
       body: wide
           ? Row(children: [
               Expanded(child: SafeArea(child: map)),
               const SizedBox(width: 400, child: _RecommendSheet(wide: true)),
             ])
           : map,
+    );
+  }
+}
+
+/// 지도를 브리핑 기준점에서 멀리 옮기면 나타나는 "이 지역 브리핑 보기" 버튼.
+/// 누르면 지금 화면 가운데를 기준으로 주변 상권과 브리핑을 다시 고른다.
+class _BriefHereButton extends ConsumerWidget {
+  const _BriefHereButton({required this.fallback});
+
+  /// 아직 브리핑 기준점을 정한 적이 없을 때의 기준 (처음 지도 가운데)
+  final LatLng fallback;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = ref.watch(mapViewCenterProvider);
+    final base = ref.watch(briefingCenterProvider) ?? fallback;
+    final show = view != null && view.distanceKm(base) > briefingRefreshDistanceKm;
+    return AnimatedSwitcher(
+      duration: motionFast,
+      child: !show
+          ? const SizedBox.shrink()
+          : Material(
+              key: const ValueKey('brief-here'),
+              color: Palette.ink,
+              elevation: 2,
+              shadowColor: const Color(0x401F1A15),
+              shape: const StadiumBorder(),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () {
+                  ref.read(briefingCenterProvider.notifier).state = view;
+                  ref.read(selectedAreaProvider.notifier).state = null;
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.refresh, size: 16, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Text('이 지역 브리핑 보기',
+                        style: Theme.of(context).textTheme.labelLarge!.copyWith(color: Colors.white)),
+                  ]),
+                ),
+              ),
+            ),
     );
   }
 }
@@ -238,8 +296,6 @@ class _RecommendSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final area = ref.watch(briefingAreaProvider);
-    final briefing = ref.watch(briefingProvider(area));
     final recs = ref.watch(recommendProvider);
     final text = Theme.of(context).textTheme;
 
@@ -258,43 +314,7 @@ class _RecommendSheet extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-            Row(children: [
-              Text('$area 친구 브리핑', style: text.titleMedium),
-              const Spacer(),
-              for (final a in briefingAreas)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: ChoiceChip(
-                    label: Text(a),
-                    showCheckmark: false,
-                    visualDensity: VisualDensity.compact,
-                    selected: a == area,
-                    onSelected: (_) =>
-                        ref.read(briefingAreaProvider.notifier).state = a,
-                  ),
-                ),
-            ]),
-            const SizedBox(height: 12),
-            briefing.when(
-              loading: () => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const LinearProgressIndicator(minHeight: 2),
-                    const SizedBox(height: 8),
-                    Text('친구들의 기록을 요약하고 있어요', style: text.bodyMedium),
-                  ]),
-              error: (e, _) =>
-                  Text('브리핑을 불러오지 못했어요. $e', style: text.bodyMedium),
-              data: (b) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final s in b.sentences)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(s, style: text.bodyLarge),
-                      ),
-                  ]),
-            ),
+            const BriefingSection(),
             const Divider(height: 24),
             Text('내 입맛에 맞는 순서', style: text.titleMedium),
             const SizedBox(height: 4),
@@ -320,7 +340,7 @@ class _RecommendSheet extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                     s.reason ??
-                                        '${s.place.category} · ${s.place.area}',
+                                        '${categoryLabel(s.place.category)} · ${s.place.area}',
                                     style: text.bodyMedium),
                               ]),
                         ),

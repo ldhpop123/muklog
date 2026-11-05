@@ -13,12 +13,20 @@ import 'zoom_buttons.dart';
 /// 종이 위 골목 지도처럼 그리고, 핀 좌표를 화면 영역에 비례 배치해 얼굴 핀 UI를 확인할 수 있다.
 /// 두 손가락·마우스 휠·버튼으로 확대하고 끌어서 옮긴다. 확대해도 얼굴 핀 크기는 그대로다.
 class PreviewMap extends StatefulWidget {
-  const PreviewMap({super.key, required this.pins, required this.onPinTap, required this.center, this.me});
+  const PreviewMap({
+    super.key,
+    required this.pins,
+    required this.onPinTap,
+    required this.center,
+    this.me,
+    this.onCameraIdle,
+  });
 
   final List<MukMapPin> pins;
   final PinTapCallback onPinTap;
   final LatLng center;
   final LatLng? me;
+  final ValueChanged<LatLng>? onCameraIdle;
 
   @override
   State<PreviewMap> createState() => _PreviewMapState();
@@ -29,6 +37,17 @@ class _PreviewMapState extends State<PreviewMap> {
   final _zoom = TransformationController();
   /// 버튼으로 확대할 때의 기준점: 필터 바와 추천 시트 사이, 보이는 지도의 가운데
   Offset _focal = Offset.zero;
+
+  /// 화면 점 → 좌표 변환 (확대 전 배치 기준). build에서 갱신한다.
+  LatLng Function(Offset base)? _unproject;
+
+  /// 보이는 지도 가운데의 좌표를 알린다 (확대·이동을 거꾸로 되돌려 계산).
+  void _reportCenter() {
+    final unproject = _unproject, cb = widget.onCameraIdle;
+    if (unproject == null || cb == null) return;
+    final inverse = Matrix4.inverted(_zoom.value);
+    cb(unproject(MatrixUtils.transformPoint(inverse, _focal)));
+  }
 
   @override
   void didUpdateWidget(covariant PreviewMap old) {
@@ -54,6 +73,7 @@ class _PreviewMapState extends State<PreviewMap> {
       ..multiply(Matrix4.diagonal3Values(k, k, 1))
       ..multiply(Matrix4.translationValues(-c.dx, -c.dy, 0))
       ..multiply(m);
+    _reportCenter();
   }
 
   @override
@@ -78,6 +98,10 @@ class _PreviewMapState extends State<PreviewMap> {
       final left = half + 16, top = 72.0, bottom = isWide(context) ? 48.0 : box.maxHeight * 0.35;
       final w = box.maxWidth - left * 2, h = box.maxHeight - top - bottom - FacePin.markerSize.height;
       _focal = Offset(box.maxWidth / 2, (top + box.maxHeight - bottom) / 2);
+      _unproject = (o) => LatLng(
+            maxLat - (o.dy - top - FacePin.faceCenterY) / h * (maxLat - minLat),
+            minLng + (o.dx - left) / w * (maxLng - minLng),
+          );
       // 확대 전 화면에서 좌표가 놓일 점 (얼굴 원의 가운데). 위도는 위로 갈수록 커지므로 뒤집는다.
       Offset spot(LatLng p) => Offset(left + norm(p.lng, minLng, maxLng) * w,
           top + (1 - norm(p.lat, minLat, maxLat)) * h + FacePin.faceCenterY);
@@ -90,6 +114,7 @@ class _PreviewMapState extends State<PreviewMap> {
           minScale: _minScale,
           maxScale: _maxScale,
           boundaryMargin: const EdgeInsets.all(double.infinity),
+          onInteractionEnd: (_) => _reportCenter(),
           child: SizedBox.fromSize(
             size: box.biggest,
             child: const ColoredBox(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/providers.dart';
+import '../../models/place.dart';
 import '../../models/user_profile.dart';
 import '../../models/visit_record.dart';
 
@@ -52,7 +53,7 @@ class PlaceDetailScreen extends ConsumerWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(place.name, style: text.headlineSmall),
                 const SizedBox(height: 4),
-                Text('${place.category} · ${place.area}', style: text.bodyMedium),
+                Text('${categoryLabel(place.category)} · ${place.area}', style: text.bodyMedium),
                 const SizedBox(height: 8),
                 Text(place.tags.map((t) => '#$t').join('  '), style: text.bodyMedium!.copyWith(color: Palette.ink)),
               ]),
@@ -104,6 +105,13 @@ class PlaceDetailScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(r.memo, style: text.bodyLarge),
                         ],
+                        if (r.photoUrls.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(spacing: 6, runSpacing: 6, children: [
+                            for (final url in r.photoUrls)
+                              PhotoThumb(url: url, size: 72, onTap: () => _showPhoto(context, url)),
+                          ]),
+                        ],
                         // "이 기록 보고 왔어요" → 방문 후 기록에 inspiredBy로 연결 (맛 신뢰 온도).
                         // 내 기록에는 달 수 없다 (서버도 거절).
                         if (r.userId != me?.id)
@@ -129,4 +137,19 @@ class PlaceDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 사진을 화면 가득 보여 준다. 두 손가락으로 확대할 수 있다.
+void _showPhoto(BuildContext context, String url) {
+  showDialog<void>(
+    context: context,
+    barrierColor: const Color(0xE61F1A15),
+    builder: (context) => GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: InteractiveViewer(
+        maxScale: 4,
+        child: Center(child: Image(image: PhotoThumb.providerFor(url), fit: BoxFit.contain)),
+      ),
+    ),
+  );
 }

@@ -20,6 +20,7 @@ import 'zoom_buttons.dart';
 extension type _NMap._(JSObject _) implements JSObject {
   external _NMap(web.HTMLElement element, _MapOptions options);
   external void setCenter(_NLatLng center);
+  external _NLatLng getCenter();
   external num getZoom();
   external void setZoom(num zoom, [bool effect]);
   external _NProjection getProjection();
@@ -28,6 +29,8 @@ extension type _NMap._(JSObject _) implements JSObject {
 @JS('naver.maps.LatLng')
 extension type _NLatLng._(JSObject _) implements JSObject {
   external _NLatLng(double lat, double lng);
+  external num lat();
+  external num lng();
 }
 
 @JS('naver.maps.Point')
@@ -108,27 +111,29 @@ Future<void> initMapSdk() async {
   return done.future;
 }
 
-Widget buildPlatformMap(List<MukMapPin> pins, PinTapCallback onPinTap, LatLng center, LatLng? me) {
+Widget buildPlatformMap(
+    List<MukMapPin> pins, PinTapCallback onPinTap, LatLng center, LatLng? me, ValueChanged<LatLng>? onCameraIdle) {
   if (!AppConfig.hasNaverMap) {
-    return PreviewMap(pins: pins, onPinTap: onPinTap, center: center, me: me);
+    return PreviewMap(pins: pins, onPinTap: onPinTap, center: center, me: me, onCameraIdle: onCameraIdle);
   }
   return ValueListenableBuilder(
     valueListenable: _authFailed,
     builder: (context, failed, _) => failed
-        ? PreviewMap(pins: pins, onPinTap: onPinTap, center: center, me: me)
-        : _NaverWebMap(pins: pins, onPinTap: onPinTap, center: center, me: me),
+        ? PreviewMap(pins: pins, onPinTap: onPinTap, center: center, me: me, onCameraIdle: onCameraIdle)
+        : _NaverWebMap(pins: pins, onPinTap: onPinTap, center: center, me: me, onCameraIdle: onCameraIdle),
   );
 }
 
 // ── 지도 위젯 ───────────────────────────────────────────────────────
 
 class _NaverWebMap extends StatefulWidget {
-  const _NaverWebMap({required this.pins, required this.onPinTap, required this.center, this.me});
+  const _NaverWebMap({required this.pins, required this.onPinTap, required this.center, this.me, this.onCameraIdle});
 
   final List<MukMapPin> pins;
   final PinTapCallback onPinTap;
   final LatLng center;
   final LatLng? me;
+  final ValueChanged<LatLng>? onCameraIdle;
 
   @override
   State<_NaverWebMap> createState() => _NaverWebMapState();
@@ -169,7 +174,11 @@ class _NaverWebMapState extends State<_NaverWebMap> {
       );
       _syncMarkers();
       _syncMe();
-      _addListener(_map!, 'idle', ((JSAny? _) => _syncMarkers()).toJS);
+      _addListener(_map!, 'idle', ((JSAny? _) {
+        _syncMarkers();
+        final c = _map!.getCenter();
+        widget.onCameraIdle?.call(LatLng(c.lat().toDouble(), c.lng().toDouble()));
+      }).toJS);
       _trigger(_map!, 'resize');
     }).toJS);
   }

@@ -33,10 +33,23 @@ abstract class MuklogRepository {
   Future<void> createRecord(VisitRecord record);
 
   Future<Coupling> couple(String friendId);
+  /// 지도 화면 가운데에서 가까운 상권 (기록이 없어도 포함), 가까운 순.
+  Future<List<AreaInfo>> nearbyAreas(LatLng center, {int limit = 5});
+
+  /// [area]는 [nearbyAreas]가 준 상권 이름.
   Future<Briefing> briefing(String area);
   Future<List<RankingEntry>> ranking(RankingScope scope);
   Future<List<Dislike>> dislikes();
   Future<List<Dislike>> saveDislikes(List<Dislike> items);
+
+  /// 식당 검색 (서버가 네이버 지역 검색을 대신 호출). near를 주면 가까운 순.
+  Future<List<PlaceCandidate>> searchPlaces(String query, {LatLng? near});
+
+  /// 검색 결과를 먹로그 식당으로 등록한다. 이미 있으면 기존 식당을 돌려준다.
+  Future<Place> createPlace(PlaceCandidate candidate);
+
+  /// 사진 한 장을 올리고 기록에 담을 주소를 돌려준다.
+  Future<String> uploadPhoto(List<int> bytes, String filename);
 }
 
 /// 사용자에게 그대로 보여 줄 수 있는 메시지를 담은 오류.
@@ -47,6 +60,3 @@ class MuklogException implements Exception {
   @override
   String toString() => message;
 }
-
-/// 브리핑을 지원하는 지역. 서버 시드 데이터의 Place.area와 같다.
-const briefingAreas = ['홍대', '연남', '상수'];

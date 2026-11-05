@@ -594,10 +594,9 @@ flutter run -d chrome --dart-define-from-file=.env    # app/.env 에 적은 값 
 3. 발급된 Client ID를 `--dart-define=NAVER_MAP_CLIENT_ID=...`로 넘깁니다.
 #### 네이버 추천 배제
 
-먹로그 지도에는 친구가 남긴 핀만 보여야 합니다. 네이버의 장소 라벨·평점·추천은 노출하지 않습니다.
+먹로그는 네이버의 평점·리뷰·추천을 가져오거나 보여 주지 않습니다. 지도 바탕에는 웹과 모바일 모두 네이버 기본 표시(지하철역·건물·가게 이름)가 그대로 보이지만, 모바일에서는 장소 이름을 눌러도 네이버 장소 정보로 넘어가지 않습니다(`consumeSymbolTapEvents: false`).
 
-- **모바일:** `symbolScale: 0`으로 네이버 장소 심볼을 숨기고 탭도 막습니다. 별도 설정은 필요 없습니다.
-- **웹:** 기본 지도는 장소 이름이 지도 이미지에 들어 있어 코드로 끌 수 없습니다. [Style Editor](https://navermaps.github.io/maps.js.ncp/docs/tutorial-2-Style-Editor.html)에서 POI(장소) 라벨을 끈 스타일을 발행한 뒤, `My Style ID`를 `--dart-define=NAVER_MAP_STYLE_ID=...`로 넘기면 벡터(GL) 지도로 표시됩니다.
+- 장소 이름까지 숨기고 친구 핀만 보이게 하려면: 모바일은 `NaverMapViewOptions(symbolScale: 0)`, 웹은 [Style Editor](https://navermaps.github.io/maps.js.ncp/docs/tutorial-2-Style-Editor.html)에서 POI 라벨을 끈 스타일의 `My Style ID`를 `NAVER_MAP_STYLE_ID`로 넘깁니다.
 
 플러그인 요구사항(Android 최소 SDK 23, iOS 12.0)은 현재 프로젝트 설정(SDK 24, iOS 15.0)이 이미 충족하고, Android 인터넷 권한도 추가되어 있습니다.
 

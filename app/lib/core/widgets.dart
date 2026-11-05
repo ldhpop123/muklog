@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'config.dart';
 import 'theme.dart';
 
 /// 단골 도장. 재방문 횟수를 노포 쿠폰 도장처럼 찍는다. 먹로그 전체에서 재방문은 이 모양으로만 보여 준다.
@@ -218,6 +219,43 @@ class ReadableWidth extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child),
+      ),
+    );
+  }
+}
+
+/// 기록 사진 썸네일. 서버 경로(/uploads/...)는 서버 주소를 붙이고, 목 데이터의 data: URL은 바로 그린다.
+class PhotoThumb extends StatelessWidget {
+  const PhotoThumb({super.key, required this.url, this.size = 72, this.onTap});
+
+  final String url;
+  final double size;
+  final VoidCallback? onTap;
+
+  static ImageProvider providerFor(String url) {
+    if (url.startsWith('data:')) return MemoryImage(UriData.parse(url).contentAsBytes());
+    final full = url.startsWith('/') ? '${AppConfig.apiBaseUrl}$url' : url;
+    return NetworkImage(full);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image(
+          image: providerFor(url),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: size,
+            height: size,
+            color: Palette.raised,
+            child: const Icon(Icons.broken_image_outlined, size: 20, color: Palette.inkMuted),
+          ),
+        ),
       ),
     );
   }

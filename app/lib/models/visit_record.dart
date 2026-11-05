@@ -13,6 +13,7 @@ class VisitRecord {
     this.tags = const [],
     this.visibility = RecordVisibility.friends,
     this.inspiredByRecordId,
+    this.photoUrls = const [],
   });
 
   final String id;
@@ -30,6 +31,9 @@ class VisitRecord {
   /// "이 기록 보고 왔어요" — 맛 신뢰 온도 계산의 연결 고리
   final String? inspiredByRecordId;
 
+  /// 친구가 올린 사진 (최대 4장). 서버 경로(/uploads/...)이거나, 목 데이터에서는 data: URL.
+  final List<String> photoUrls;
+
   factory VisitRecord.fromJson(Map<String, dynamic> json) => VisitRecord(
         id: json['id'] as String,
         userId: json['user_id'] as String,
@@ -42,5 +46,6 @@ class VisitRecord {
         visibility: RecordVisibility.values
             .byName(json['visibility'] as String? ?? 'friends'),
         inspiredByRecordId: json['inspired_by_record_id'] as String?,
+        photoUrls: (json['photo_urls'] as List?)?.cast<String>() ?? const [],
       );
 }

@@ -33,7 +33,17 @@ class HomeShell extends StatelessWidget {
             labelType: NavigationRailLabelType.all,
             leading: Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 24),
-              child: Text('먹로그', style: Theme.of(context).textTheme.titleMedium),
+              child: Column(children: [
+                Text('먹로그', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 16),
+                FloatingActionButton.small(
+                  heroTag: 'record',
+                  tooltip: '다녀왔어요',
+                  elevation: 0,
+                  onPressed: () => context.push('/record/search'),
+                  child: const Icon(Icons.edit_outlined, size: 18),
+                ),
+              ]),
             ),
             destinations: [
               for (final (icon, label) in _items)

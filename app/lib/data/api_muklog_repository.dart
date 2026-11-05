@@ -117,11 +117,18 @@ class ApiMuklogRepository implements MuklogRepository {
             'tags': record.tags,
             'visibility': record.visibility.name,
             'inspired_by_record_id': record.inspiredByRecordId,
+            'photo_urls': record.photoUrls,
           }));
 
   @override
   Future<Coupling> couple(String friendId) async =>
       Coupling.fromJson(await _getMap('/users/$friendId/couple'));
+
+  @override
+  Future<List<AreaInfo>> nearbyAreas(LatLng center, {int limit = 5}) async =>
+      (await _getList('/areas', query: {'lat': center.lat, 'lng': center.lng, 'limit': limit}))
+          .map(AreaInfo.fromJson)
+          .toList();
 
   @override
   Future<Briefing> briefing(String area) async =>
@@ -147,5 +154,31 @@ class ApiMuklogRepository implements MuklogRepository {
             .cast<Map<String, dynamic>>()
             .map(Dislike.fromJson)
             .toList();
+      });
+
+  @override
+  Future<List<PlaceCandidate>> searchPlaces(String query, {LatLng? near}) async =>
+      (await _getList('/places/search', query: {
+        'query': query,
+        if (near != null) 'lat': near.lat,
+        if (near != null) 'lng': near.lng,
+      }))
+          .map(PlaceCandidate.fromJson)
+          .toList();
+
+  @override
+  Future<Place> createPlace(PlaceCandidate candidate) => _call(() async {
+        final res = await _dio.post<Map<String, dynamic>>('/places', data: candidate.toJson());
+        return Place.fromJson(res.data!);
+      });
+
+  @override
+  Future<String> uploadPhoto(List<int> bytes, String filename) => _call(() async {
+        final form = FormData.fromMap({'file': MultipartFile.fromBytes(bytes, filename: filename)});
+        final res = await _dio.post<Map<String, dynamic>>('/uploads',
+            data: form,
+            options: Options(
+                sendTimeout: const Duration(seconds: 30), receiveTimeout: const Duration(seconds: 30)));
+        return res.data!['url'] as String;
       });
 }

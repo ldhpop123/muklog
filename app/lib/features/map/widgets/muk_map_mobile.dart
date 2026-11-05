@@ -15,20 +15,22 @@ Future<void> initMapSdk() async {
   );
 }
 
-Widget buildPlatformMap(List<MukMapPin> pins, PinTapCallback onPinTap, LatLng center, LatLng? me) {
+Widget buildPlatformMap(
+    List<MukMapPin> pins, PinTapCallback onPinTap, LatLng center, LatLng? me, ValueChanged<LatLng>? onCameraIdle) {
   if (!AppConfig.hasNaverMap) {
-    return PreviewMap(pins: pins, onPinTap: onPinTap, center: center, me: me);
+    return PreviewMap(pins: pins, onPinTap: onPinTap, center: center, me: me, onCameraIdle: onCameraIdle);
   }
-  return _NaverMobileMap(pins: pins, onPinTap: onPinTap, center: center, me: me);
+  return _NaverMobileMap(pins: pins, onPinTap: onPinTap, center: center, me: me, onCameraIdle: onCameraIdle);
 }
 
 class _NaverMobileMap extends StatefulWidget {
-  const _NaverMobileMap({required this.pins, required this.onPinTap, required this.center, this.me});
+  const _NaverMobileMap({required this.pins, required this.onPinTap, required this.center, this.me, this.onCameraIdle});
 
   final List<MukMapPin> pins;
   final PinTapCallback onPinTap;
   final LatLng center;
   final LatLng? me;
+  final ValueChanged<LatLng>? onCameraIdle;
 
   @override
   State<_NaverMobileMap> createState() => _NaverMobileMapState();
@@ -162,11 +164,20 @@ class _NaverMobileMapState extends State<_NaverMobileMap> {
           target: _n(widget.center),
           zoom: defaultMapZoom,
         ),
-        // 먹로그는 친구 추천만 보여 준다. 네이버 장소 심볼(식당·가게 이름 등)은 숨기고 탭도 막는다.
-        symbolScale: 0,
+        // 웹 지도와 같이 네이버 기본 표시(지하철역·건물·가게 이름 등)를 그대로 보여 준다.
+        // 표시만 하고 탭은 지도가 받지 않게 한다 (네이버 장소 정보 화면으로 넘어가지 않음).
         consumeSymbolTapEvents: false,
+        // 기기 언어와 상관없이 지도 글자는 한국어로 (영어 기기에서 "Yeonnam-dong 연남동"처럼 두 줄로 나오지 않게)
+        locale: const Locale('ko'),
       ),
       clusterOptions: NaverMapClusteringOptions(clusterMarkerBuilder: _styleCluster),
+      onCameraIdle: () async {
+        final controller = _controller;
+        final cb = widget.onCameraIdle;
+        if (controller == null || cb == null) return;
+        final t = (await controller.getCameraPosition()).target;
+        cb(LatLng(t.latitude, t.longitude));
+      },
       onMapReady: (controller) {
         _controller = controller;
         _syncMarkers();

@@ -24,6 +24,7 @@ class MukMap extends StatelessWidget {
     required this.onPinTap,
     required this.center,
     this.me,
+    this.onCameraIdle,
   });
 
   final List<MukMapPin> pins;
@@ -35,6 +36,9 @@ class MukMap extends StatelessWidget {
   /// 내 현재 위치. 있으면 지도에 내 위치 점을 찍는다.
   final LatLng? me;
 
+  /// 지도가 움직임을 멈출 때마다 화면 가운데 좌표를 알려 준다 ("이 지역 브리핑 보기"용).
+  final ValueChanged<LatLng>? onCameraIdle;
+
   @override
-  Widget build(BuildContext context) => platform.buildPlatformMap(pins, onPinTap, center, me);
+  Widget build(BuildContext context) => platform.buildPlatformMap(pins, onPinTap, center, me, onCameraIdle);
 }

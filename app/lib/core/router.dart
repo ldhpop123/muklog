@@ -11,6 +11,7 @@ import '../features/party/party_mode_screen.dart';
 import '../features/place/place_detail_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/ranking/ranking_screen.dart';
+import '../features/record/place_search_screen.dart';
 import '../features/record/record_form_screen.dart';
 import '../features/shell/home_shell.dart';
 
@@ -57,6 +58,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) =>
             ReadableWidth(child: FriendCompareScreen(friendId: state.pathParameters['id']!)),
       ),
+      GoRoute(path: '/record/search', builder: (_, __) => const ReadableWidth(child: PlaceSearchScreen())),
       GoRoute(path: '/ranking', builder: (_, __) => const ReadableWidth(child: RankingScreen())),
       GoRoute(path: '/dislikes', builder: (_, __) => const ReadableWidth(child: DislikesScreen())),
       GoRoute(
@@ -65,6 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           child: RecordFormScreen(
             placeId: state.uri.queryParameters['placeId']!,
             inspiredByRecordId: state.uri.queryParameters['inspiredBy'],
+            fromSearch: state.uri.queryParameters['from'] == 'search',
           ),
         ),
       ),
