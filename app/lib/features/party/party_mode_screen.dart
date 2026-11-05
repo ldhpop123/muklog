@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/widgets.dart';
 import '../../data/muklog_repository.dart';
 import '../../data/providers.dart';
 
@@ -38,8 +39,7 @@ class _PartyModeScreenState extends ConsumerState<PartyModeScreen> {
               value: _selected.contains(f.id),
               onChanged: (on) => setState(
                   () => on! ? _selected.add(f.id) : _selected.remove(f.id)),
-              secondary:
-                  CircleAvatar(backgroundImage: NetworkImage(f.avatarUrl)),
+              secondary: Face(url: f.avatarUrl, size: 40),
               title: Text(f.nickname),
               subtitle: me == null
                   ? null

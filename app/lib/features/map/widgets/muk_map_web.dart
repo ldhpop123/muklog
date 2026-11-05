@@ -157,7 +157,7 @@ class _NaverWebMapState extends State<_NaverWebMap> {
         icon: _HtmlIcon(
           content: _facePinHtml(pin),
           size: _NSize(size.width, size.height),
-          anchor: _NPoint(size.width / 2, 40),
+          anchor: _NPoint(size.width / 2, 44),
         ),
       ));
       _addListener(
@@ -186,21 +186,28 @@ class _NaverWebMapState extends State<_NaverWebMap> {
   }
 }
 
-/// 모바일 FacePin 위젯과 같은 모양의 HTML 마커.
+/// 모바일 FacePin 위젯과 같은 모양의 HTML 마커 (흰 테두리 얼굴 + 단골 도장 + 이름표).
 String _facePinHtml(MukMapPin pin) {
   final faces = pin.avatarUrls.take(3).toList();
   final imgs = [
     for (var i = 0; i < faces.length; i++)
-      '<img src="${_escape(faces[i])}" style="position:absolute;left:${i * 18}px;top:0;'
-          'width:34px;height:34px;border-radius:50%;border:3px solid #E8572A;object-fit:cover;background:#fff">'
+      '<img src="${_escape(faces[i])}" style="position:absolute;left:${i * 20}px;top:0;'
+          'width:39px;height:39px;border-radius:50%;border:2.5px solid #FDFAF5;object-fit:cover;'
+          'background:#EFE7DB;box-shadow:0 1px 3px rgba(31,26,21,.1)">'
   ].join();
-  final facesWidth = 40 + (faces.length - 1) * 18;
+  final stamp = pin.visits >= 2
+      ? '<div style="position:absolute;right:-6px;top:-8px;width:25px;height:25px;border-radius:50%;'
+          'border:1.5px solid #C2461A;background:#FDFAF5;color:#C2461A;font-size:8.5px;font-weight:600;'
+          'display:flex;align-items:center;justify-content:center;transform:rotate(-8deg);'
+          'font-variant-numeric:tabular-nums">${pin.visits}회</div>'
+      : '';
+  final facesWidth = 44 + (faces.length - 1) * 20 + (pin.visits >= 2 ? 16 : 0);
   return '<div style="width:${FacePin.markerSize.width}px;display:flex;flex-direction:column;'
-      'align-items:center;cursor:pointer;font-family:sans-serif">'
-      '<div style="position:relative;width:${facesWidth}px;height:40px">$imgs</div>'
-      '<div style="margin-top:2px;max-width:120px;padding:2px 6px;background:#fff;border-radius:6px;'
-      'font-size:11px;font-weight:600;color:#000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
-      'box-shadow:0 1px 3px rgba(0,0,0,.2)">${_escape(pin.label)}</div>'
+      'align-items:center;cursor:pointer;font-family:\'IBM Plex Sans KR\',sans-serif">'
+      '<div style="position:relative;width:${facesWidth}px;height:44px">$imgs$stamp</div>'
+      '<div style="margin-top:4px;max-width:128px;padding:4px 8px;background:#FDFAF5;border-radius:6px;'
+      'border:1px solid rgba(31,26,21,.08);font-size:12px;font-weight:500;color:#1F1A15;'
+      'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_escape(pin.label)}</div>'
       '</div>';
 }
 

@@ -7,12 +7,16 @@ class MukMapPin {
     required this.label,
     required this.location,
     required this.avatarUrls,
+    this.visits = 0,
   });
 
   final String placeId;
   final String label;
   final LatLng location;
   final List<String> avatarUrls;
+
+  /// 핀에 보이는 사람들의 총 방문 횟수. 2회 이상이면 단골 도장을 찍는다.
+  final int visits;
 }
 
 typedef PinTapCallback = void Function(String placeId);

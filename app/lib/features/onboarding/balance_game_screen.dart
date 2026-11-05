@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/router.dart';
+import '../../core/theme.dart';
 import '../../data/providers.dart';
 import '../../models/taste_vector.dart';
 
@@ -53,31 +54,63 @@ class _BalanceGameScreenState extends ConsumerState<BalanceGameScreen> {
   @override
   Widget build(BuildContext context) {
     final q = _questions[_step];
+    final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar:
-          AppBar(title: Text('입맛 밸런스 게임 ${_step + 1}/${_questions.length}')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LinearProgressIndicator(value: (_step + 1) / _questions.length),
-            const SizedBox(height: 32),
-            Text('둘 중 하나만 고른다면?',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 32),
-            Expanded(
-                child: _ChoiceCard(label: q.left, onTap: () => _choose(-1))),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('VS',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontWeight: FontWeight.w800)),
-            ),
-            Expanded(
-                child: _ChoiceCard(label: q.right, onTap: () => _choose(1))),
-          ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                Text('먹로그', style: text.titleMedium),
+                const Spacer(),
+                Text('${_step + 1} / ${_questions.length}',
+                    style: text.bodyMedium!.copyWith(fontFeatures: tabular)),
+              ]),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: (_step + 1) / _questions.length,
+                  minHeight: 3,
+                  color: Palette.ember,
+                ),
+              ),
+              const SizedBox(height: 40),
+              Text(TasteVector.labels[q.dimension], style: text.bodyMedium),
+              const SizedBox(height: 4),
+              Text('둘 중 하나만 고른다면', style: text.headlineSmall),
+              const SizedBox(height: 8),
+              Text('고른 답으로 첫 입맛 지도를 그려요. 기록이 쌓이면 더 정확해져요', style: text.bodyMedium),
+              const SizedBox(height: 32),
+              Expanded(
+                child: _ChoiceCard(
+                  label: q.left,
+                  pole: TasteVector.poles[q.dimension].$1,
+                  onTap: () => _choose(-1),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(children: [
+                  const Expanded(child: Divider(height: 1)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('또는', style: text.bodySmall),
+                  ),
+                  const Expanded(child: Divider(height: 1)),
+                ]),
+              ),
+              Expanded(
+                child: _ChoiceCard(
+                  label: q.right,
+                  pole: TasteVector.poles[q.dimension].$2,
+                  onTap: () => _choose(1),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -85,19 +118,36 @@ class _BalanceGameScreenState extends ConsumerState<BalanceGameScreen> {
 }
 
 class _ChoiceCard extends StatelessWidget {
-  const _ChoiceCard({required this.label, required this.onTap});
+  const _ChoiceCard({required this.label, required this.pole, required this.onTap});
   final String label;
+  final String pole;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final text = Theme.of(context).textTheme;
+    return Material(
+      color: Palette.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Palette.hairline),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Center(
-            child:
-                Text(label, style: Theme.of(context).textTheme.headlineSmall)),
+        hoverColor: Palette.raised.withValues(alpha: 0.5),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(label, style: text.headlineSmall),
+              const SizedBox(height: 4),
+              Text(pole, style: text.bodyMedium),
+            ],
+          ),
+        ),
       ),
     );
   }

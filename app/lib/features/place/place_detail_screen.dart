@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/providers.dart';
 import '../../models/user_profile.dart';
 import '../../models/visit_record.dart';
@@ -32,59 +34,94 @@ class PlaceDetailScreen extends ConsumerWidget {
 
     if (place == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-
     }
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(place.name)),
+      appBar: AppBar(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/record/new?placeId=$placeId'),
-        icon: const Icon(Icons.edit),
-        label: const Text('기록하기'),
+        icon: const Icon(Icons.edit_outlined, size: 18),
+        label: const Text('다녀왔어요'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
         children: [
-          Text('${place.category} · 친구 재방문 ${place.revisitTotal}회'),
-          const SizedBox(height: 8),
-          Wrap(
-              spacing: 6,
-              children: [for (final t in place.tags) Chip(label: Text('#$t'))]),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(place.name, style: text.headlineSmall),
+                const SizedBox(height: 4),
+                Text('${place.category} · ${place.area}', style: text.bodyMedium),
+                const SizedBox(height: 8),
+                Text(place.tags.map((t) => '#$t').join('  '), style: text.bodyMedium!.copyWith(color: Palette.ink)),
+              ]),
+            ),
+            if (place.revisitTotal >= 2) VisitStamp(count: place.revisitTotal, size: 56),
+          ]),
           if (me != null) ...[
-            const SizedBox(height: 8),
-            Text('나와의 예상 적합도 ${me.taste.couplePercent(place.taste)}%',
-                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Palette.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Palette.hairline),
+              ),
+              child: Row(children: [
+                Expanded(child: Text('내 입맛과 맞는 정도', style: text.bodyMedium)),
+                Text('${me.taste.couplePercent(place.taste)}%',
+                    style: text.titleLarge!.copyWith(color: Palette.ember, fontFeatures: tabular)),
+              ]),
+            ),
           ],
-          const Divider(height: 32),
-          Text('친구들의 기록', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 32),
+          Text('다녀간 사람들의 기록', style: text.titleMedium),
+          const SizedBox(height: 8),
           records.when(
             loading: () => const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator())),
-            error: (e, _) => Text('기록을 불러오지 못했어요\n$e'),
+                padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
+            error: (e, _) => Text('기록을 불러오지 못했어요. $e', style: text.bodyMedium),
             data: (rs) => Column(children: [
               for (final r in rs)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundImage: authors[r.userId] == null
-                        ? null
-                        : NetworkImage(authors[r.userId]!.avatarUrl),
-                  ),
-                  title: Text(
-                      '${r.userId == me?.id ? '나' : authors[r.userId]?.nickname ?? '알 수 없음'}'
-                      ' · ★${r.rating} · ${r.visitNo}번째 방문'),
-                  subtitle: Text(r.memo),
-                  // "이 기록 보고 왔어요" → 방문 후 기록에 inspiredBy로 연결 (맛 신뢰 온도).
-                  // 내 기록에는 달 수 없다 (서버도 거절).
-                  trailing: r.userId == me?.id
-                      ? null
-                      : IconButton(
-                          tooltip: '이 기록 보고 왔어요',
-                          icon: const Icon(Icons.thumb_up_alt_outlined),
-                          onPressed: () => context.push(
-                              '/record/new?placeId=$placeId&inspiredBy=${r.id}'),
-                        ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Face(url: authors[r.userId]?.avatarUrl, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Text(r.userId == me?.id ? '나' : authors[r.userId]?.nickname ?? '알 수 없음',
+                              style: text.bodyLarge!.copyWith(fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.star_rounded, size: 16, color: Palette.ember),
+                          const SizedBox(width: 2),
+                          Text(r.rating.toStringAsFixed(1),
+                              style: text.bodyMedium!.copyWith(color: Palette.ink, fontFeatures: tabular)),
+                        ]),
+                        if (r.memo.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(r.memo, style: text.bodyLarge),
+                        ],
+                        // "이 기록 보고 왔어요" → 방문 후 기록에 inspiredBy로 연결 (맛 신뢰 온도).
+                        // 내 기록에는 달 수 없다 (서버도 거절).
+                        if (r.userId != me?.id)
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Palette.inkSoft,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 32),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => context.push('/record/new?placeId=$placeId&inspiredBy=${r.id}'),
+                            icon: const Icon(Icons.thumb_up_alt_outlined, size: 16),
+                            label: const Text('이 기록 보고 다녀왔어요'),
+                          ),
+                      ]),
+                    ),
+                    if (r.visitNo >= 2) VisitStamp(count: r.visitNo),
+                  ]),
                 ),
             ]),
           ),

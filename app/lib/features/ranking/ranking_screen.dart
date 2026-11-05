@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/providers.dart';
 import '../../models/social.dart';
 
@@ -34,35 +36,42 @@ class _RankingList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = ref.watch(rankingProvider(scope));
     final myId = ref.watch(meProvider).valueOrNull?.id;
+    final text = Theme.of(context).textTheme;
     return entries.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('$e')),
-      data: (list) => ListView(children: [
+      data: (list) => ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: [
         for (final e in list)
-          ListTile(
-            selected: e.user.id == myId,
-            leading: SizedBox(
-              width: 72,
-              child: Row(children: [
-                SizedBox(
-                    width: 24,
-                    child: Text('${e.rank}',
-                        style: const TextStyle(fontWeight: FontWeight.w800))),
-                CircleAvatar(backgroundImage: NetworkImage(e.user.avatarUrl)),
-              ]),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: e.user.id == myId ? Palette.raised : null,
+              borderRadius: BorderRadius.circular(10),
             ),
-            title: Text(
-                // 내 줄은 강조색(selected)으로 표시하고, 닉네임이 "나"가 아닐 때만 (나)를 붙인다.
-                e.user.id == myId && e.user.nickname != '나'
-                    ? '${e.user.nickname} (나)'
-                    : e.user.nickname),
-            subtitle: Text([
-              e.user.level,
-              if (e.user.title != null) e.user.title!
-            ].join(' · ')),
-            trailing: Text('${e.user.trustTemp.toStringAsFixed(1)}℃',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            child: Row(children: [
+              SizedBox(
+                width: 28,
+                child: Text('${e.rank}',
+                    style: text.titleMedium!.copyWith(
+                        color: e.rank == 1 ? Palette.ember : Palette.inkMuted, fontFeatures: tabular)),
+              ),
+              Face(url: e.user.avatarUrl, size: 40),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // 닉네임이 "나"가 아닐 때만 (나)를 붙인다. 내 줄은 바탕색으로 구분한다.
+                  Text(
+                    e.user.id == myId && e.user.nickname != '나' ? '${e.user.nickname} (나)' : e.user.nickname,
+                    style: text.bodyLarge,
+                  ),
+                  Text([e.user.level, if (e.user.title != null) e.user.title!].join(' · '),
+                      style: text.bodyMedium),
+                ]),
+              ),
+              Text('${e.user.trustTemp.toStringAsFixed(1)}℃',
+                  style: text.titleMedium!.copyWith(fontFeatures: tabular)),
+            ]),
           ),
       ]),
     );

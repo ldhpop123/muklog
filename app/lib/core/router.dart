@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'widgets.dart';
 import '../features/dislikes/dislikes_screen.dart';
 import '../features/friend/friend_compare_screen.dart';
 import '../features/map/map_screen.dart';
@@ -36,33 +37,35 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(
-          path: '/onboarding', builder: (_, __) => const BalanceGameScreen()),
+          path: '/onboarding', builder: (_, __) => const ReadableWidth(child: BalanceGameScreen())),
       ShellRoute(
         builder: (_, state, child) =>
             HomeShell(location: state.uri.path, child: child),
         routes: [
           GoRoute(path: '/', builder: (_, __) => const MapScreen()),
-          GoRoute(path: '/party', builder: (_, __) => const PartyModeScreen()),
-          GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          GoRoute(path: '/party', builder: (_, __) => const ReadableWidth(child: PartyModeScreen())),
+          GoRoute(path: '/profile', builder: (_, __) => const ReadableWidth(child: ProfileScreen())),
         ],
       ),
       GoRoute(
         path: '/place/:id',
         builder: (_, state) =>
-            PlaceDetailScreen(placeId: state.pathParameters['id']!),
+            ReadableWidth(child: PlaceDetailScreen(placeId: state.pathParameters['id']!)),
       ),
       GoRoute(
         path: '/friend/:id',
         builder: (_, state) =>
-            FriendCompareScreen(friendId: state.pathParameters['id']!),
+            ReadableWidth(child: FriendCompareScreen(friendId: state.pathParameters['id']!)),
       ),
-      GoRoute(path: '/ranking', builder: (_, __) => const RankingScreen()),
-      GoRoute(path: '/dislikes', builder: (_, __) => const DislikesScreen()),
+      GoRoute(path: '/ranking', builder: (_, __) => const ReadableWidth(child: RankingScreen())),
+      GoRoute(path: '/dislikes', builder: (_, __) => const ReadableWidth(child: DislikesScreen())),
       GoRoute(
         path: '/record/new',
-        builder: (_, state) => RecordFormScreen(
-          placeId: state.uri.queryParameters['placeId']!,
-          inspiredByRecordId: state.uri.queryParameters['inspiredBy'],
+        builder: (_, state) => ReadableWidth(
+          child: RecordFormScreen(
+            placeId: state.uri.queryParameters['placeId']!,
+            inspiredByRecordId: state.uri.queryParameters['inspiredBy'],
+          ),
         ),
       ),
     ],

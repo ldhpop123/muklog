@@ -6,6 +6,6 @@ void main() {
   testWidgets('앱이 온보딩 화면으로 시작한다', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: MuklogApp()));
     await tester.pumpAndSettle();
-    expect(find.textContaining('입맛 밸런스 게임'), findsOneWidget);
+    expect(find.text('둘 중 하나만 고른다면'), findsOneWidget);
   });
 }

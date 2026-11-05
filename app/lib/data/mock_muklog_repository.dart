@@ -353,7 +353,7 @@ class MockMuklogRepository implements MuklogRepository {
       area: area,
       sentences: [
         for (final s in top)
-          '${s.place.name}: ${s.reason}. #${s.place.tags.join(' #')}',
+          "'${s.place.name}'은 ${s.reason?.replaceFirst('방문', '다녀간')} 곳이에요. #${s.place.tags.join(' #')}",
       ],
       places: top,
       byLlm: false,

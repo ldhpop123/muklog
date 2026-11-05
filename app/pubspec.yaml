@@ -14,6 +14,7 @@ dependencies:
   dio: ^5.7.0
   flutter_naver_map: ^1.4.4
   web: ^1.1.0
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

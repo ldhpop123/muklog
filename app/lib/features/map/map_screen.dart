@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/muklog_repository.dart';
 import '../../data/providers.dart';
 import '../../models/social.dart';
@@ -39,19 +43,30 @@ final mapPinsProvider = FutureProvider<List<MukMapPin>>((ref) async {
   for (final p in places) {
     // TODO(api): 지도 영역(bbox) 단위로 핀과 얼굴을 한 번에 받는 API로 바꾸기
     final records = await repo.recordsForPlace(p.id);
-    final faces = records
+    final shown = records
         .where((r) => switch (filter.layer) {
               MapLayer.mine => r.userId == me.id,
               MapLayer.friends => r.userId != me.id,
               MapLayer.all => true,
             })
+        .toList();
+    // 사람마다 가장 높은 방문 회차를 더한다 (같은 사람의 기록 여러 개를 중복으로 세지 않음)
+    final visitsByUser = <String, int>{};
+    for (final r in shown) {
+      visitsByUser[r.userId] = math.max(visitsByUser[r.userId] ?? 0, r.visitNo);
+    }
+    final faces = shown
         .map((r) => authors[r.userId]?.avatarUrl)
         .whereType<String>()
         .toSet()
         .toList();
     if (faces.isEmpty) continue;
     pins.add(MukMapPin(
-        placeId: p.id, label: p.name, location: p.location, avatarUrls: faces));
+        placeId: p.id,
+        label: p.name,
+        location: p.location,
+        avatarUrls: faces,
+        visits: visitsByUser.values.fold(0, (a, b) => a + b)));
   }
   return pins;
 });
@@ -62,18 +77,26 @@ class MapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pins = ref.watch(mapPinsProvider);
+    final wide = isWide(context);
+    final map = Stack(children: [
+      pins.when(
+        data: (pins) =>
+            MukMap(pins: pins, onPinTap: (id) => context.push('/place/$id')),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('지도를 불러오지 못했어요. $e')),
+      ),
+      const Positioned(top: 8, left: 0, right: 0, child: _FilterBar()),
+      if (!wide) const _RecommendSheet(wide: false),
+    ]);
     return Scaffold(
-      appBar: AppBar(title: const Text('먹로그')),
-      body: Stack(children: [
-        pins.when(
-          data: (pins) =>
-              MukMap(pins: pins, onPinTap: (id) => context.push('/place/$id')),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('지도를 불러오지 못했어요\n$e')),
-        ),
-        const Positioned(top: 8, left: 0, right: 0, child: _FilterBar()),
-        const _RecommendSheet(),
-      ]),
+      // 넓은 화면은 왼쪽 내비게이션에 이름이 있으므로 앱바를 생략한다.
+      appBar: wide ? null : AppBar(title: const Text('먹로그')),
+      body: wide
+          ? Row(children: [
+              Expanded(child: SafeArea(child: map)),
+              const SizedBox(width: 400, child: _RecommendSheet(wide: true)),
+            ])
+          : map,
     );
   }
 }
@@ -97,8 +120,6 @@ class _FilterBar extends ConsumerWidget {
           ],
           selected: {filter.layer},
           showSelectedIcon: false,
-          style: const ButtonStyle(
-              backgroundColor: WidgetStatePropertyAll(Colors.white)),
           onSelectionChanged: (s) =>
               notifier.state = filter.copyWith(layer: s.first),
         ),
@@ -108,7 +129,6 @@ class _FilterBar extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 6),
             child: FilterChip(
               label: Text('#$t'),
-              backgroundColor: Colors.white,
               selected: filter.tags.contains(t),
               onSelected: (on) => notifier.state = filter.copyWith(
                   tags:
@@ -121,82 +141,133 @@ class _FilterBar extends ConsumerWidget {
 }
 
 /// 지도 위로 끌어올리는 시트: AI 지역 브리핑 + 개인화 추천 목록 (Fit × Trust × Context).
+/// 좁은 화면은 지도 위로 끌어올리는 시트, 넓은 화면은 지도 오른쪽에 고정된 패널.
 class _RecommendSheet extends ConsumerWidget {
-  const _RecommendSheet();
+  const _RecommendSheet({required this.wide});
+
+  final bool wide;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final area = ref.watch(briefingAreaProvider);
     final briefing = ref.watch(briefingProvider(area));
     final recs = ref.watch(recommendProvider);
-    final titleStyle = Theme.of(context)
-        .textTheme
-        .titleMedium
-        ?.copyWith(fontWeight: FontWeight.w700);
+    final text = Theme.of(context).textTheme;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.3,
-      minChildSize: 0.12,
-      maxChildSize: 0.85,
-      builder: (context, controller) => Material(
-        elevation: 8,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        child: ListView(
+    Widget panel(ScrollController? controller) => ListView(
           controller: controller,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: EdgeInsets.fromLTRB(20, wide ? 24 : 8, 20, 24),
           children: [
-            Text('친구들의 맛집 브리핑', style: titleStyle),
-            const SizedBox(height: 8),
-            Wrap(spacing: 6, children: [
+            if (!wide)
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                      color: Palette.raised,
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+            Row(children: [
+              Text('$area 친구 브리핑', style: text.titleMedium),
+              const Spacer(),
               for (final a in briefingAreas)
-                ChoiceChip(
-                  label: Text(a),
-                  selected: a == area,
-                  onSelected: (_) =>
-                      ref.read(briefingAreaProvider.notifier).state = a,
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: ChoiceChip(
+                    label: Text(a),
+                    showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    selected: a == area,
+                    onSelected: (_) =>
+                        ref.read(briefingAreaProvider.notifier).state = a,
+                  ),
                 ),
             ]),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             briefing.when(
-              loading: () => const Column(
+              loading: () => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LinearProgressIndicator(),
-                    SizedBox(height: 6),
-                    Text('친구들의 기록을 요약하고 있어요'),
+                    const LinearProgressIndicator(minHeight: 2),
+                    const SizedBox(height: 8),
+                    Text('친구들의 기록을 요약하고 있어요', style: text.bodyMedium),
                   ]),
-              error: (e, _) => Text('브리핑을 불러오지 못했어요: $e'),
+              error: (e, _) =>
+                  Text('브리핑을 불러오지 못했어요. $e', style: text.bodyMedium),
               data: (b) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final s in b.sentences)
                       Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(s)),
-                    if (!b.byLlm)
-                      Text('AI 요약 대신 기본 문장으로 보여 드려요',
-                          style: Theme.of(context).textTheme.bodySmall),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(s, style: text.bodyLarge),
+                      ),
                   ]),
             ),
-            const Divider(height: 28),
-            Text('내 입맛 맞춤 추천', style: titleStyle),
+            const Divider(height: 24),
+            Text('내 입맛에 맞는 순서', style: text.titleMedium),
+            const SizedBox(height: 4),
             recs.when(
               loading: () => const Padding(
                   padding: EdgeInsets.all(16),
                   child: Center(child: CircularProgressIndicator())),
-              error: (e, _) => Text('추천을 불러오지 못했어요\n$e'),
+              error: (e, _) =>
+                  Text('추천을 불러오지 못했어요. $e', style: text.bodyMedium),
               data: (items) => Column(children: [
                 for (final s in items)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(s.place.name),
-                    subtitle: Text(s.reason ?? s.place.tags.join(' · ')),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
                     onTap: () => context.push('/place/${s.place.id}'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(children: [
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.place.name, style: text.bodyLarge),
+                                const SizedBox(height: 2),
+                                Text(
+                                    s.reason ??
+                                        '${s.place.category} · ${s.place.area}',
+                                    style: text.bodyMedium),
+                              ]),
+                        ),
+                        if (s.place.revisitTotal >= 2)
+                          VisitStamp(count: s.place.revisitTotal, size: 36),
+                      ]),
+                    ),
                   ),
               ]),
             ),
           ],
+        );
+
+    if (wide) {
+      return DecoratedBox(
+        decoration: const BoxDecoration(
+          color: Palette.card,
+          border: Border(left: BorderSide(color: Palette.hairline)),
         ),
+        child: SafeArea(child: panel(null)),
+      );
+    }
+    return DraggableScrollableSheet(
+      initialChildSize: 0.32,
+      minChildSize: 0.12,
+      maxChildSize: 0.85,
+      builder: (context, controller) => Container(
+        decoration: const BoxDecoration(
+          color: Palette.card,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+                color: Color(0x141F1A15), blurRadius: 24, offset: Offset(0, -4))
+          ],
+        ),
+        child: panel(controller),
       ),
     );
   }
