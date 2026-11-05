@@ -5,13 +5,16 @@ import re
 
 from fastapi import APIRouter, HTTPException
 
-from .. import llm, store
+from .. import areas, llm, store
 from ..schemas import Briefing, BriefingSentence, Record, ScoredPlace
 from .recommend import scored_for
 
 router = APIRouter(prefix="/briefing", tags=["briefing"])
 
 TOP_PLACES = 3
+
+# 행정동 이름 형식. 예: 서교동, 숭인1동, 종로1·2·3·4가동, 상계3·4동
+_DONG_NAME = re.compile(r"^[가-힣0-9·.]{1,15}(동|읍|면)$")
 
 # LLM 입력이 같으면 같은 브리핑을 돌려준다. 로컬 LLM은 한 번에 10~20초 걸려서 시연·반복 조회에 필요하다.
 # 입력(지역·식당·친구 기록)이 바뀌면 키가 달라져 자연히 새로 만든다.
@@ -54,19 +57,22 @@ _SCHEMA = {
 
 @router.get("")
 def briefing(area: str) -> Briefing:
-    """지역 안 친구 기록을 모아 점수 상위 식당을 자연어로 요약한다."""
-    areas = {p.area for p in store.places.values()}
-    if area not in areas:
-        raise HTTPException(404, f"지원하지 않는 지역입니다. 가능한 지역: {sorted(areas)}")
+    """상권 또는 행정동 안 친구 기록을 모아 점수 상위 식당을 자연어로 요약한다.
 
+    - 상권: 식당 좌표로 정한 소속(반경 안 가장 가까운 상권, areas.area_of)
+    - 행정동: 등록 때 역지오코딩으로 정한 Place.dong이 같은 식당 전부(상권 소속과 상관없이)
+    """
+    if area not in areas.BY_NAME and not _DONG_NAME.match(area):
+        raise HTTPException(404, "지원하지 않는 지역입니다. GET /areas로 주변 상권을 확인해 주세요")
+    in_area = {p.id for p in store.places_in(area)}
     me = store.users[store.ME_ID]
     friend_ids = store.follows.get(me.id, set())
     friend_records = [
         r for r in store.visible_records(me.id)
-        if r.user_id in friend_ids and store.places[r.place_id].area == area
+        if r.user_id in friend_ids and r.place_id in in_area
     ]
     with_friends = {r.place_id for r in friend_records}
-    top = [s for s in scored_for(me) if s.place.area == area and s.place.id in with_friends][:TOP_PLACES]
+    top = [s for s in scored_for(me) if s.place.id in with_friends][:TOP_PLACES]
     if not top:
         return Briefing(area=area, sentences=[BriefingSentence(
             text=f"아직 {area}에 친구 기록이 없어요. 먼저 다녀온 곳을 기록해 보세요.", record_ids=[])],

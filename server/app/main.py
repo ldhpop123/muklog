@@ -9,9 +9,12 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
-from .routers import briefing, places, ranking, recommend, records, uploads, users  # noqa: E402
+from .routers import areas, briefing, places, ranking, recommend, records, uploads, users  # noqa: E402
 
 app = FastAPI(title="먹로그 API", version="0.3.0")
+
+# 업로드 본문 크기를 받는 도중에 제한한다. CORS보다 먼저 추가해 안쪽에 두어야 413 응답에도 CORS 헤더가 붙는다.
+app.add_middleware(uploads.UploadSizeLimit)
 
 # Flutter 웹 개발 서버(임의 포트)에서 호출할 수 있도록 허용. 배포 시 도메인으로 제한.
 app.add_middleware(
@@ -26,6 +29,7 @@ app.include_router(places.router)
 app.include_router(records.router)
 app.include_router(recommend.router)
 app.include_router(briefing.router)
+app.include_router(areas.router)
 app.include_router(ranking.router)
 app.include_router(uploads.router)
 

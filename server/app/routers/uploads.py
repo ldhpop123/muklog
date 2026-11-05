@@ -9,6 +9,8 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ..schemas import UploadOut
 
@@ -17,6 +19,72 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 UPLOAD_DIR = Path(os.getenv("MUKLOG_UPLOAD_DIR", Path(__file__).resolve().parents[2] / "uploads"))
 MAX_BYTES = 10 * 1024 * 1024
 _CHUNK = 1024 * 1024
+
+
+# multipart 경계·헤더 몫으로 본문에 더 허용하는 여유분
+_BODY_OVERHEAD = 64 * 1024
+
+
+class _TooLarge(Exception):
+    pass
+
+
+class UploadSizeLimit:
+    """POST /uploads 요청 본문을 받는 도중에 크기를 센다.
+
+    FastAPI는 핸들러를 부르기 전에 multipart 본문 전체를 임시 파일로 받아 두므로, 핸들러 안의 검사만으로는
+    큰 요청이 디스크를 다 쓴 뒤에야 막힌다. Content-Length가 크면 바로 413을 주고,
+    Content-Length가 없거나 거짓이어도 실제로 받은 바이트가 한도를 넘는 순간 끊는다.
+    TODO(deploy): 리버스 프록시에서도 본문 크기를 제한한다.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] != "POST" or scope["path"].rstrip("/") != "/uploads":
+            await self.app(scope, receive, send)
+            return
+
+        limit = MAX_BYTES + _BODY_OVERHEAD
+        length = dict(scope["headers"]).get(b"content-length")
+        if length is not None and length.isdigit() and int(length) > limit:
+            await _reject(scope, receive, send)
+            return
+
+        received = 0
+        started = False
+        rejected = False
+
+        async def counting_receive() -> Message:
+            # 한도를 넘으면 그 자리에서 413을 보낸다. FastAPI는 본문 파싱 중 예외를 400으로 바꾸므로
+            # 예외만 던져서는 413이 나가지 않는다. 그 뒤 앱이 보내는 응답은 tracking_send가 버린다.
+            nonlocal received, rejected
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    if not started and not rejected:
+                        rejected = True
+                        await _reject(scope, receive, send)
+                    raise _TooLarge
+            return message
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal started
+            if rejected:
+                return
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, counting_receive, tracking_send)
+        except _TooLarge:
+            pass
+
+
+async def _reject(scope: Scope, receive: Receive, send: Send) -> None:
+    await JSONResponse({"detail": "사진은 10MB까지 올릴 수 있어요"}, status_code=413)(scope, receive, send)
 
 
 def detect_image(head: bytes) -> str | None:

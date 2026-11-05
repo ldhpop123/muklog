@@ -11,6 +11,8 @@ import html
 import logging
 import os
 import re
+import threading
+import time
 
 import httpx
 from pydantic import BaseModel
@@ -18,6 +20,8 @@ from pydantic import BaseModel
 log = logging.getLogger(__name__)
 
 LOCAL_SEARCH_URL = "https://naverapihub.apigw.ntruss.com/search/v1/local"
+# NCP Maps Reverse Geocoding. 문서: https://api.ncloud-docs.com/docs/application-maps-reversegeocoding
+REVERSE_GEOCODE_URL = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc"
 MAX_RESULTS = 5  # 지역 검색 API가 한 번에 주는 최대 개수 (기본값은 1이라 꼭 보낸다)
 
 
@@ -99,4 +103,84 @@ def search_local(query: str) -> list[NaverPlace]:
 
     places = [p for item in res.json().get("items", []) if (p := parse_item(item))]
     # 같은 가게가 두 번 나오는 경우를 합친다.
-    return list({p.external_id: p for p in places}.values())
+    unique = list({p.external_id: p for p in places}.values())
+    _remember(unique)
+    return unique
+
+
+# 서버가 직접 받은 검색 결과. 식당 등록(POST /places)은 이 안에 있는 후보만 받아서,
+# 클라이언트가 이름·좌표·external_id를 지어내 식당을 만들지 못하게 한다.
+_SEEN_TTL = 60 * 60
+_SEEN_MAX = 2000
+_seen: dict[str, tuple[NaverPlace, float]] = {}
+_seen_lock = threading.Lock()
+
+
+def _remember(places: list[NaverPlace]) -> None:
+    now = time.monotonic()
+    with _seen_lock:
+        if len(_seen) + len(places) > _SEEN_MAX:
+            for key in [k for k, (_, t) in _seen.items() if now - t > _SEEN_TTL] or list(_seen)[: len(places)]:
+                _seen.pop(key, None)
+        for p in places:
+            _seen[p.external_id] = (p, now)
+
+
+def recall(external_id: str) -> NaverPlace | None:
+    """최근 1시간 안에 이 서버가 검색해서 돌려준 후보면 그 값을, 아니면 None."""
+    with _seen_lock:
+        hit = _seen.get(external_id)
+    if hit is None or time.monotonic() - hit[1] > _SEEN_TTL:
+        return None
+    return hit[0]
+
+
+# 검색어에 이미 지역이 들어 있는지 보는 단어. "서교동 칼국수", "홍대 국밥", "합정역 파스타" 같은 경우.
+_REGION_SUFFIX = re.compile(r"\S+(동|구|역|시|군|읍|면|로|길)$")
+_REGION_WORDS = ("홍대", "연남", "상수", "합정", "망원", "신촌", "이태원", "성수", "강남", "건대", "종로", "을지로")
+
+
+def has_region(query: str) -> bool:
+    return any(_REGION_SUFFIX.match(t) or t in _REGION_WORDS for t in query.split())
+
+
+def _reverse(lat: float, lng: float) -> dict[str, str]:
+    """좌표 → {"legalcode": 법정동, "admcode": 행정동}. 키가 없거나 실패하면 빈 dict.
+
+    키는 NAVER_MAP_CLIENT_ID, NAVER_MAP_CLIENT_SECRET (앱 지도와 같은 NCP Maps 애플리케이션).
+    """
+    client_id = os.getenv("NAVER_MAP_CLIENT_ID")
+    client_secret = os.getenv("NAVER_MAP_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return {}
+    try:
+        res = httpx.get(
+            REVERSE_GEOCODE_URL,
+            params={"coords": f"{lng},{lat}", "orders": "legalcode,admcode", "output": "json"},
+            headers={"x-ncp-apigw-api-key-id": client_id, "x-ncp-apigw-api-key": client_secret},
+            timeout=3.0,
+        )
+        res.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        log.warning("역지오코딩 실패 (%s): %s", e.response.status_code, e.response.text[:200])
+        return {}
+    except httpx.HTTPError as e:
+        log.warning("역지오코딩 연결 실패: %s", e)
+        return {}
+    names = {}
+    for result in res.json().get("results", []):
+        name = result.get("region", {}).get("area3", {}).get("name")
+        if name and result.get("name") in ("legalcode", "admcode"):
+            names[result["name"]] = name
+    return names
+
+
+def reverse_geocode(lat: float, lng: float) -> str | None:
+    """좌표 → 법정동 이름(예 "서교동"). 검색어에 붙이는 용도. 실패하면 None."""
+    names = _reverse(lat, lng)
+    return names.get("legalcode") or names.get("admcode")
+
+
+def admin_dong(lat: float, lng: float) -> str | None:
+    """좌표 → 행정동 이름(예 "숭인1동"). 동네 브리핑 단위. 실패하면 None."""
+    return _reverse(lat, lng).get("admcode")

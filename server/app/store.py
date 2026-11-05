@@ -9,7 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from . import extract, taste
+from . import areas, extract, taste
 from .schemas import Attributes, Dislike, Place, PlaceIn, Record, RecordIn, TasteVector, User
 
 
@@ -54,23 +54,16 @@ places: dict[str, Place] = {
     p.id: p
     for p in [
         Place(id="p1", name="서교 순댓국", lat=37.5550, lng=126.9205, area="홍대", category="국밥",
-              taste=_tv(-0.5, 0.0, -0.9, 0.8, -0.9), tags=["노포", "아재입맛", "혼밥"], revisit_total=11),
+              taste=_tv(-0.5, 0.0, -0.9, 0.8, -0.9), tags=["노포", "아재입맛", "혼밥"], revisit_total=11,
+              dong="서교동"),
         Place(id="p2", name="연남 마라공방", lat=37.5612, lng=126.9248, area="연남", category="중식",
-              taste=_tv(0.6, 0.9, 0.3, 0.2, 0.5), tags=["매운맛", "데이트"], revisit_total=3),
+              taste=_tv(0.6, 0.9, 0.3, 0.2, 0.5), tags=["매운맛", "데이트"], revisit_total=3, dong="연남동"),
         Place(id="p3", name="홍대 골목포차", lat=37.5534, lng=126.9241, area="홍대", category="주점",
-              taste=_tv(0.2, 0.3, -0.4, 0.6, -0.4), tags=["안주맛집", "노포"], revisit_total=7),
+              taste=_tv(0.2, 0.3, -0.4, 0.6, -0.4), tags=["안주맛집", "노포"], revisit_total=7, dong="서교동"),
         Place(id="p4", name="상수 파스타랩", lat=37.5478, lng=126.9227, area="상수", category="양식",
-              taste=_tv(0.0, -0.4, 0.9, -0.5, 0.9), tags=["데이트", "감성"], revisit_total=2),
+              taste=_tv(0.0, -0.4, 0.9, -0.5, 0.9), tags=["데이트", "감성"], revisit_total=2, dong="서강동"),
     ]
 }
-
-# 시연 지역의 중심 좌표. 새 식당이 이 반경 안이면 해당 지역으로 묶는다.
-AREA_CENTERS: dict[str, tuple[float, float]] = {
-    "홍대": (37.5545, 126.9220),
-    "연남": (37.5620, 126.9250),
-    "상수": (37.5478, 126.9227),
-}
-AREA_RADIUS_KM = 0.8
 
 # 식당 벡터의 사전값. 리뷰 추출값이 쌓이면 이 값과 평균낸다.
 place_priors: dict[str, TasteVector] = {p.id: p.taste for p in places.values()}
@@ -298,22 +291,37 @@ def _title(counted: list[TrustEvent], user_id: str, level: str) -> str | None:
     return f"{area} {category} 감별사"
 
 
+def nearest_area(lat: float, lng: float) -> str:
+    """가장 가까운 상권 이름. 역지오코딩을 못 쓸 때 검색어에 붙이는 대체값."""
+    return areas.nearest(lat, lng, limit=1)[0][0].name
+
+
 def area_for(lat: float, lng: float, address: str) -> str:
-    """가장 가까운 시연 지역(반경 안), 없으면 주소의 동·읍·면 이름, 그것도 없으면 '기타'."""
-    nearest = min(AREA_CENTERS, key=lambda a: taste.distance_km(lat, lng, *AREA_CENTERS[a]))
-    if taste.distance_km(lat, lng, *AREA_CENTERS[nearest]) <= AREA_RADIUS_KM:
-        return nearest
+    """식당이 속한 상권(반경 안 가장 가까운 곳), 없으면 주소의 동·읍·면 이름, 그것도 없으면 '기타'."""
+    name = areas.area_of(lat, lng)
+    if name:
+        return name
     for token in address.split():
         if token.endswith(("동", "읍", "면", "가")) and not token[0].isdigit() and len(token) > 1:
             return token
     return "기타"
 
 
+def places_in(name: str) -> list[Place]:
+    """브리핑 대상 식당. 상권 이름이면 그 상권 소속(반경 안 가장 가까운 상권), 아니면 그 행정동의 식당 전부.
+
+    동네 브리핑은 상권 소속과 상관없이 그 동 전체를 보여 준다. 사용자가 동을 골랐다면 동 전체를 보고 싶어 하기 때문.
+    """
+    if name in areas.BY_NAME:
+        return [p for p in places.values() if areas.area_of(p.lat, p.lng) == name]
+    return [p for p in places.values() if p.dong == name]
+
+
 def find_place_by_external(external_id: str) -> Place | None:
     return next((p for p in places.values() if p.external_id == external_id), None)
 
 
-def add_place(data: PlaceIn) -> tuple[Place, bool]:
+def add_place(data: PlaceIn, dong: str | None = None) -> tuple[Place, bool]:
     """외부 검색 결과로 식당을 등록한다. 같은 external_id가 있으면 기존 식당과 False를 돌려준다.
 
     취향 벡터 사전값은 0(중립)으로 두고, 기록이 쌓이면 리뷰 추출값으로 채워진다.
@@ -329,7 +337,7 @@ def add_place(data: PlaceIn) -> tuple[Place, bool]:
         place = Place(
             id=f"p{n}", name=data.name, lat=data.lat, lng=data.lng, category=data.category,
             area=area_for(data.lat, data.lng, data.address), taste=neutral,
-            address=data.address or None, external_id=data.external_id,
+            address=data.address or None, external_id=data.external_id, dong=dong,
         )
         places[place.id] = place
         place_priors[place.id] = neutral

@@ -160,6 +160,9 @@ def test_briefing_template():
     assert "민수님은 4번이나" in res["sentences"][0]["text"]
     assert {i for s in res["sentences"] for i in s["record_ids"]} <= {"r1", "r2", "r4"}
     assert client.get("/briefing", params={"area": "부산"}).status_code == 404
+    empty = client.get("/briefing", params={"area": "성수"}).json()
+    assert empty["places"] == []
+    assert empty["sentences"][0]["text"] == "아직 성수에 친구 기록이 없어요. 먼저 다녀온 곳을 기록해 보세요."
 
 
 def test_briefing_drops_unsupported_llm_sentences(monkeypatch):
@@ -257,3 +260,62 @@ def test_briefing_drops_sentence_mixing_places(monkeypatch):
     monkeypatch.setattr(briefing, "_cache", {})
     res = client.get("/briefing", params={"area": "홍대"}).json()
     assert [s["text"] for s in res["sentences"]] == ["순댓국 이야기"]
+
+
+def test_nearby_areas_from_map_center():
+    # 홍대입구역 근처 지도 가운데
+    res = client.get("/areas", params={"lat": 37.5565, "lng": 126.9235, "limit": 5}).json()
+    assert res[0]["name"] == "홍대"
+    assert [a["distance_km"] for a in res] == sorted(a["distance_km"] for a in res)
+    counts = {a["name"]: a["record_count"] for a in res}
+    # 친구 기록: 홍대(p1 r1·r2, p3 r4) 3건, 연남(p2 r3) 1건, 상수(p4)는 0건
+    assert counts["홍대"] == 3
+    assert counts["연남"] == 1
+    assert counts.get("상수", 0) == 0
+    assert client.get("/areas", params={"lat": 37.5}).status_code == 422
+
+
+def test_districts_do_not_overlap_in_briefing():
+    from app import areas
+
+    # 홍대와 연남은 가깝지만 연남 식당(p2)은 홍대 브리핑에 안 나온다.
+    hongdae = client.get("/briefing", params={"area": "홍대"}).json()
+    assert "p2" not in {p["place"]["id"] for p in hongdae["places"]}
+    assert areas.area_of(37.5612, 126.9248) == "연남"
+    assert areas.area_of(37.6542, 127.0568) is None
+
+
+def test_areas_mix_dong_when_no_district_nearby(monkeypatch):
+    from app import naver
+
+    monkeypatch.setattr(naver, "admin_dong", lambda lat, lng: "황학동")
+    # 신당·황학 근처: 1km 안 상권 없음, 3km 안에는 동묘·왕십리 등
+    res = client.get("/areas", params={"lat": 37.5650, "lng": 127.0250}).json()
+    assert res[0] == {"kind": "dong", "name": "황학동", "lat": 37.565, "lng": 127.025,
+                      "distance_km": 0.0, "record_count": 0}
+    assert all(a["kind"] == "area" and a["distance_km"] <= 3 for a in res[1:])
+    assert "동묘" in [a["name"] for a in res]
+    assert len(res) <= 5
+
+
+def test_areas_dong_goes_last_when_district_nearby(monkeypatch):
+    from app import naver
+
+    monkeypatch.setattr(naver, "admin_dong", lambda lat, lng: "숭인1동")
+    res = client.get("/areas", params={"lat": 37.5732, "lng": 127.0163, "limit": 3}).json()
+    assert res[0]["name"] == "동묘"
+    assert res[-1]["kind"] == "dong" and res[-1]["name"] == "숭인1동"
+    assert len(res) == 3
+
+
+def test_areas_far_from_everything_and_no_key():
+    # 상계동: 3km 안 상권 없음, 역지오코딩 키도 없음 → 빈 목록
+    assert client.get("/areas", params={"lat": 37.6542, "lng": 127.0568}).json() == []
+
+
+def test_dong_briefing_includes_all_places_in_dong():
+    res = client.get("/briefing", params={"area": "서교동"}).json()
+    assert {p["place"]["id"] for p in res["places"]} == {"p1", "p3"}
+    empty = client.get("/briefing", params={"area": "숭인1동"}).json()
+    assert empty["sentences"][0]["text"] == "아직 숭인1동에 친구 기록이 없어요. 먼저 다녀온 곳을 기록해 보세요."
+    assert client.get("/briefing", params={"area": "강남구"}).status_code == 404

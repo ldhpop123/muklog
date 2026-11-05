@@ -61,6 +61,8 @@ class Place(BaseModel):
     revisit_total: int = 0
     address: str | None = None
     external_id: str | None = None
+    # 행정동. 동네 브리핑 단위. 등록 때 역지오코딩으로 정하고, 키가 없으면 None.
+    dong: str | None = None
 
 
 class PlaceIn(BaseModel):
@@ -177,3 +179,12 @@ class PublicUser(BaseModel):
 class RankingEntry(BaseModel):
     rank: int
     user: PublicUser
+
+
+class AreaSummary(BaseModel):
+    kind: Literal["area", "dong"] = "area"
+    name: str
+    lat: float
+    lng: float
+    distance_km: float
+    record_count: int

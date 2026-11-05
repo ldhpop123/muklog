@@ -611,7 +611,7 @@ python3 -m venv .venv
 .venv/bin/python -m pytest
 ```
 
-서버 설정은 `server/.env`에 둡니다(`server/.env.example`을 복사해서 채움, git에는 올라가지 않음). 식당 검색은 [NAVER API HUB 지역 검색](https://api.ncloud-docs.com/docs/naver-api-hub-search-local)을 씁니다. NCP 콘솔 > Application Services > NAVER API HUB에서 Application을 등록해 발급받은 Client ID·Secret을 `NAVER_SEARCH_CLIENT_ID`, `NAVER_SEARCH_CLIENT_SECRET`에 넣습니다(기존 개발자 센터 키는 쓸 수 없음, 하루 25,000회 한도). 키가 없으면 검색 API는 503과 안내 문구를 돌려줍니다. 네이버 평점·리뷰는 가져오지 않습니다.
+서버 설정은 `server/.env`에 둡니다(`server/.env.example`을 복사해서 채움, git에는 올라가지 않음). 식당 검색은 [NAVER API HUB 지역 검색](https://api.ncloud-docs.com/docs/naver-api-hub-search-local)을 씁니다. NCP 콘솔 > Application Services > NAVER API HUB에서 Application을 등록해 발급받은 Client ID·Secret을 `NAVER_SEARCH_CLIENT_ID`, `NAVER_SEARCH_CLIENT_SECRET`에 넣습니다(기존 개발자 센터 키는 쓸 수 없음, 하루 25,000회 한도). 키가 없으면 검색 API는 503과 안내 문구를 돌려줍니다. 주변 검색어 보정과 행정동 브리핑에는 NCP Maps Reverse Geocoding을 쓰고, 앱 지도와 같은 Maps 애플리케이션의 Client ID·Secret을 `NAVER_MAP_CLIENT_ID`, `NAVER_MAP_CLIENT_SECRET`에 넣습니다(없으면 상권만으로 동작). 네이버 평점·리뷰는 가져오지 않습니다.
 
 LLM(속성 추출·지역 브리핑)은 `MUKLOG_LLM`으로 고릅니다. 꺼져 있거나 호출이 실패하면 키워드 규칙과 문장 템플릿으로 동작합니다.
 
@@ -644,7 +644,8 @@ M3 Pro(18GB) 기준으로 속성 추출은 리뷰당 3~5초가 걸리고, 기록
 | `PUT /users/me/taste` | 밸런스 게임 결과 저장 |
 | `GET·PUT /users/me/dislikes` | 불호·알레르기 목록 |
 | `GET /users/{id}/couple` | 입맛 커플링 지수, 차원별 비교, 친구가 만족한 곳 추천 |
-| `GET /briefing?area=홍대` | AI 지역 브리핑 (문장마다 근거 기록 ID) |
+| `GET /areas?lat=&lng=&limit=5` | 지도 가운데 3km 안 상권(서울 29곳, `server/app/areas.py`) + 그 좌표의 행정동(`kind: "dong"`, 역지오코딩 키 필요)과 친구 기록 수 |
+| `GET /briefing?area=홍대` | AI 브리핑. 상권은 반경 안 가장 가까운 상권 소속 식당, 행정동(예 `서교동`)은 그 동 식당 전부. 문장마다 근거 기록 ID |
 | `GET /ranking?scope=friends\|all` | 맛 신뢰 온도 랭킹 |
 
 ---
