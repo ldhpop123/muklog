@@ -188,3 +188,72 @@ def test_all_ranking_hides_non_friend_taste(monkeypatch):
     res = client.get("/ranking", params={"scope": "all"}).json()
     assert "u2" in {e["user"]["id"] for e in res}
     assert all("taste" not in e["user"] for e in res)
+
+
+def test_private_record_does_not_change_place():
+    from app import store
+
+    before = store.places["p2"].taste
+    client.post("/records", json={"place_id": "p2", "rating": 5, "memo": "노포 감성 가성비", "visibility": "private"})
+    assert store.places["p2"].taste == before
+
+
+def test_repeated_inspired_records_count_once():
+    from app import store
+
+    client.post("/records", json={"place_id": "p1", "rating": 4.5, "inspired_by_record_id": "r1"})
+    once = store.users["u1"].trust_temp
+    for _ in range(5):
+        client.post("/records", json={"place_id": "p1", "rating": 4.5, "inspired_by_record_id": "r1"})
+    assert store.users["u1"].trust_temp == once
+    assert len(store.counted_trust_events("u1")) == 1
+
+
+def test_one_user_cannot_drag_place_vector():
+    from app import store
+
+    client.post("/records", json={"place_id": "p4", "rating": 5, "memo": "얼얼한 마라"})
+    one = store.places["p4"].taste.spiciness
+    for _ in range(5):
+        client.post("/records", json={"place_id": "p4", "rating": 5, "memo": "얼얼한 마라"})
+    assert store.places["p4"].taste.spiciness == one
+
+
+def test_place_tag_needs_two_distinct_users():
+    from app import store
+
+    for _ in range(3):
+        client.post("/records", json={"place_id": "p4", "rating": 5, "memo": "혼밥하기 좋음"})
+    assert "혼밥" not in store.places["p4"].tags
+
+
+def test_briefing_strips_id_leak_and_caches(monkeypatch):
+    from app import llm
+    from app.routers import briefing
+
+    calls = []
+
+    def fake(*a, **k):
+        calls.append(1)
+        return {"sentences": [{"text": "홍대에서는 '서교 순댓국'이 좋아요. record_ids: [\"r1\"]", "record_ids": ["r1"]}]}
+
+    monkeypatch.setattr(llm, "complete_json", fake)
+    monkeypatch.setattr(briefing, "_cache", {})
+    first = client.get("/briefing", params={"area": "홍대"}).json()
+    second = client.get("/briefing", params={"area": "홍대"}).json()
+    assert first["sentences"][0]["text"] == "홍대에서는 '서교 순댓국'이 좋아요."
+    assert second == first
+    assert len(calls) == 1
+
+
+def test_briefing_drops_sentence_mixing_places(monkeypatch):
+    from app import llm
+    from app.routers import briefing
+
+    monkeypatch.setattr(llm, "complete_json", lambda *a, **k: {"sentences": [
+        {"text": "순댓국 이야기", "record_ids": ["r1"]},
+        {"text": "섞인 문장", "record_ids": ["r4", "r2"]},
+    ]})
+    monkeypatch.setattr(briefing, "_cache", {})
+    res = client.get("/briefing", params={"area": "홍대"}).json()
+    assert [s["text"] for s in res["sentences"]] == ["순댓국 이야기"]

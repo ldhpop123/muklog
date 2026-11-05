@@ -610,7 +610,21 @@ python3 -m venv .venv
 .venv/bin/python -m pytest
 ```
 
-LLM(속성 추출·지역 브리핑)은 기본으로 꺼져 있고, 꺼져 있으면 키워드 규칙과 문장 템플릿으로 동작합니다. 켜려면 Anthropic 인증(`ANTHROPIC_API_KEY` 또는 `ant auth login`)을 준비한 뒤 `MUKLOG_LLM=on`으로 서버를 실행합니다. 모델은 `MUKLOG_LLM_MODEL`로 바꿀 수 있습니다(기본 `claude-opus-5-5`).
+LLM(속성 추출·지역 브리핑)은 `MUKLOG_LLM`으로 고릅니다. 꺼져 있거나 호출이 실패하면 키워드 규칙과 문장 템플릿으로 동작합니다.
+
+| `MUKLOG_LLM` | 동작 | 기본 모델 (`MUKLOG_LLM_MODEL`로 변경) |
+| --- | --- | --- |
+| `off` (기본) | LLM 없이 규칙·템플릿. 테스트도 이 모드 | — |
+| `ollama` | 로컬 Ollama 서버 (`OLLAMA_URL`, 기본 `http://localhost:11434`) | `qwen3:8b` |
+| `claude` | Claude API. `ANTHROPIC_API_KEY` 또는 `ant auth login` 필요 | `claude-haiku-5-5` |
+
+```bash
+brew install ollama && brew services start ollama
+ollama pull qwen3:8b                         # 약 5GB
+MUKLOG_LLM=ollama .venv/bin/uvicorn app.main:app --reload --port 8010
+```
+
+M3 Pro(18GB) 기준으로 속성 추출은 리뷰당 3~5초가 걸리고, 기록 저장 후 백그라운드에서 처리됩니다. 지역 브리핑은 처음 만들 때 약 14초가 걸리고, 같은 입력이면 캐시로 바로 응답합니다.
 
 | 엔드포인트 | 기능 |
 | --- | --- |

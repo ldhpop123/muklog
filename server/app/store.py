@@ -168,15 +168,34 @@ def process_record(record_id: str) -> None:
 
 
 def _refresh_place(place_id: str) -> None:
-    samples = [record_attrs[r.id].as_list() for r in records if r.place_id == place_id and r.id in record_attrs]
-    tag_counts = Counter(t for r in records if r.place_id == place_id and r.id in record_attrs
-                         for t in record_attrs[r.id].tags)
+    """식당 벡터·태그를 공개 범위 안의 기록으로 다시 계산한다.
+
+    - 비공개 기록은 빼서, 비공개 메모 내용이 식당 벡터·태그로 새어 나가지 않게 한다(본인 취향 학습에는 쓴다).
+    - 한 사용자의 여러 기록은 차원별 평균 1개 표본으로 합쳐, 한 사람이 기록을 반복해 식당 벡터를 끌고 가지 못하게 한다.
+    - 태그는 서로 다른 사용자 2명 이상이 뒷받침해야 식당에 붙는다.
+    """
+    by_user: dict[str, list[Attributes]] = {}
+    for r in records:
+        if r.place_id == place_id and r.visibility != "private" and r.id in record_attrs:
+            by_user.setdefault(r.user_id, []).append(record_attrs[r.id])
+
+    samples = [_merge(attrs) for attrs in by_user.values()]
+    tag_users = Counter(t for attrs in by_user.values() for t in {t for a in attrs for t in a.tags})
     place = places[place_id]
-    new_tags = place.tags + [t for t, n in tag_counts.most_common() if n >= 2 and t not in place.tags]
+    new_tags = place.tags + [t for t, n in tag_users.most_common() if n >= 2 and t not in place.tags]
     places[place_id] = place.model_copy(update={
         "taste": TasteVector.from_list(taste.place_vector(place_priors[place_id].as_list(), samples)),
         "tags": new_tags,
     })
+
+
+def _merge(attrs: list[Attributes]) -> list[float | None]:
+    """여러 기록의 속성을 차원별 평균 1개로 합친다. 값이 하나도 없는 차원은 None."""
+    merged: list[float | None] = []
+    for d in range(len(taste.DIMENSIONS)):
+        values = [v for a in attrs if (v := a.as_list()[d]) is not None]
+        merged.append(sum(values) / len(values) if values else None)
+    return merged
 
 
 def refresh_user_taste(user_id: str) -> None:
@@ -219,35 +238,48 @@ def _add_trust_event(visit: Record) -> None:
     refresh_trust(source.user_id)
 
 
+TRUST_MAX_PER_VISITOR = 3  # 방문자 한 명이 추천자 한 명의 온도에 반영할 수 있는 최대 평가 수
+
+
+def counted_trust_events(recommender_id: str) -> list[TrustEvent]:
+    """온도에 반영할 평가만 고른다 (README 7.4 어뷰징 방지).
+
+    - (방문자, 원본 기록) 쌍마다 가장 최근 평가 1건만 센다. 같은 기록을 보고 여러 번 기록해도 한 번이다.
+    - 방문자 한 명당 최근 TRUST_MAX_PER_VISITOR건까지만 센다. 반복 평가로 온도를 계속 움직일 수 없다.
+    """
+    latest: dict[tuple[str, str], TrustEvent] = {}
+    for e in trust_events:
+        if e.recommender_id == recommender_id:
+            latest[(e.visitor_id, e.source_record_id)] = e
+    per_visitor: dict[str, list[TrustEvent]] = {}
+    for e in latest.values():
+        per_visitor.setdefault(e.visitor_id, []).append(e)
+    return [
+        e for events in per_visitor.values()
+        for e in sorted(events, key=lambda x: x.created_at)[-TRUST_MAX_PER_VISITOR:]
+    ]
+
+
 def refresh_trust(user_id: str) -> None:
     """맛 신뢰 온도·레벨·칭호 재계산 (README 7.2~7.4).
 
-    같은 방문자의 평가는 3건째부터 가중치를 줄인다(상호 평가 어뷰징 완화).
     TODO(abuse): 방문 인증(체크인·영수증)된 평가만 반영, 단기간 몰린 평가 탐지.
     """
-    per_visitor: Counter[str] = Counter()
-    scored: list[tuple[float, float]] = []
-    for e in trust_events:
-        if e.recommender_id != user_id:
-            continue
-        k = per_visitor[e.visitor_id]
-        per_visitor[e.visitor_id] += 1
-        scored.append((e.score, 1 / (1 + max(0, k - 2))))
-
-    temp = taste.trust_temperature(base_temps.get(user_id, taste.BASE_TEMP), scored)
+    counted = counted_trust_events(user_id)
+    temp = taste.trust_temperature(base_temps.get(user_id, taste.BASE_TEMP), [(e.score, 1.0) for e in counted])
     level = taste.trust_level(temp)
     users[user_id] = users[user_id].model_copy(
-        update={"trust_temp": temp, "level": level, "title": _title(user_id, level)}
+        update={"trust_temp": temp, "level": level, "title": _title(counted, user_id, level)}
     )
 
 
-def _title(user_id: str, level: str) -> str | None:
+def _title(counted: list[TrustEvent], user_id: str, level: str) -> str | None:
     """칭호 = 긍정 평가가 가장 많이 몰린 '지역 + 카테고리' (README 7.3). 지역 감별사 이상만."""
     if level not in ("지역 감별사", "먹로그 마스터"):
         return None
     combos: Counter[tuple[str, str]] = Counter()
-    for e in trust_events:
-        if e.recommender_id == user_id and e.agreement >= 0.75:
+    for e in counted:
+        if e.agreement >= 0.75:
             source = find_record(e.source_record_id)
             if source:
                 p = places[source.place_id]
