@@ -12,6 +12,7 @@ app/pubspec.lock.bak
 
 # Python
 server/.venv/
+server/uploads/
 __pycache__/
 *.pyc
 .pytest_cache/

@@ -611,6 +611,8 @@ python3 -m venv .venv
 .venv/bin/python -m pytest
 ```
 
+서버 설정은 `server/.env`에 둡니다(`server/.env.example`을 복사해서 채움, git에는 올라가지 않음). 식당 검색은 [NAVER API HUB 지역 검색](https://api.ncloud-docs.com/docs/naver-api-hub-search-local)을 씁니다. NCP 콘솔 > Application Services > NAVER API HUB에서 Application을 등록해 발급받은 Client ID·Secret을 `NAVER_SEARCH_CLIENT_ID`, `NAVER_SEARCH_CLIENT_SECRET`에 넣습니다(기존 개발자 센터 키는 쓸 수 없음, 하루 25,000회 한도). 키가 없으면 검색 API는 503과 안내 문구를 돌려줍니다. 네이버 평점·리뷰는 가져오지 않습니다.
+
 LLM(속성 추출·지역 브리핑)은 `MUKLOG_LLM`으로 고릅니다. 꺼져 있거나 호출이 실패하면 키워드 규칙과 문장 템플릿으로 동작합니다.
 
 | `MUKLOG_LLM` | 동작 | 기본 모델 (`MUKLOG_LLM_MODEL`로 변경) |
@@ -630,8 +632,11 @@ M3 Pro(18GB) 기준으로 속성 추출은 리뷰당 3~5초가 걸리고, 기록
 | 엔드포인트 | 기능 |
 | --- | --- |
 | `GET /places?bbox=&tags=&layer=all\|friends\|mine` | 지도 식당 (영역·태그·친구 레이어 필터) |
+| `GET /places/search?query=&lat=&lng=` | NAVER API HUB 지역 검색으로 식당 후보 (이름·주소·좌표만, 위치를 주면 가까운 순, 등록된 곳은 `place_id`) |
+| `POST /places` | 검색 후보를 식당으로 등록 (같은 `external_id`면 기존 식당, 지역은 서버가 결정) |
+| `POST /uploads` | 사진 1장 업로드 (jpg·png·webp·heic, 10MB 이하) → `{url}`. `/uploads/{파일명}`으로 서빙. MVP 한계: 파일명은 무작위지만 URL을 알면 누구나 볼 수 있음(비공개 기록 사진 포함) |
 | `GET /places/{id}/records` | 식당의 볼 수 있는 기록 |
-| `POST /records` | 기록 작성. 저장 후 백그라운드로 속성 추출 → 식당·내 취향 벡터 갱신 → (보고 온 기록이 있으면) 추천자 신뢰 온도 갱신 |
+| `POST /records` | 기록 작성(`photo_urls`는 업로드한 사진 최대 4장). 저장 후 백그라운드로 속성 추출 → 식당·내 취향 벡터 갱신 → (보고 온 기록이 있으면) 추천자 신뢰 온도 갱신 |
 | `GET /records/{id}/attributes` | 기록에서 추출한 5대 미식 속성 |
 | `GET /recommend?lat=&lng=` | 개인화 추천 (위치를 주면 거리 감쇠, 내 불호 제외) |
 | `POST /recommend/party` | 파티 모드 (구성원 불호·알레르기 제외, 추천 이유) |

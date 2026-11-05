@@ -1,9 +1,9 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
-from .. import store
-from ..schemas import Place, Record
+from .. import naver, store, taste
+from ..schemas import Place, PlaceCandidate, PlaceIn, Record
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -51,6 +51,41 @@ def list_places(
         and (not tags or set(tags) & set(p.tags))
         and (allowed is None or p.id in allowed)
     ]
+
+
+@router.get("/search")
+def search_places(
+    query: Annotated[str, Query(min_length=1, max_length=50)],
+    lat: float | None = None,
+    lng: float | None = None,
+) -> list[PlaceCandidate]:
+    """네이버 지역 검색으로 식당 후보를 찾는다. 이름·주소·좌표만 쓰고 네이버 평점·리뷰는 쓰지 않는다.
+
+    lat·lng를 주면 가까운 순으로 정렬한다. 이미 등록된 식당이면 place_id를 채운다.
+    """
+    if (lat is None) != (lng is None):
+        raise HTTPException(422, "lat과 lng은 함께 보내야 합니다")
+    try:
+        found = naver.search_local(query.strip())
+    except naver.SearchUnavailable as e:
+        raise HTTPException(503, str(e))
+
+    candidates = []
+    for p in found:
+        existing = store.find_place_by_external(p.external_id)
+        candidates.append(PlaceCandidate(**p.model_dump(), place_id=existing.id if existing else None))
+    if lat is not None and lng is not None:
+        candidates.sort(key=lambda c: taste.distance_km(lat, lng, c.lat, c.lng))
+    return candidates
+
+
+@router.post("", status_code=201)
+def create_place(data: PlaceIn, response: Response) -> Place:
+    """검색 후보를 먹로그 식당으로 등록한다. 이미 있는 external_id면 기존 식당을 200으로 돌려준다."""
+    place, created = store.add_place(data)
+    if not created:
+        response.status_code = 200
+    return place
 
 
 @router.get("/{place_id}/records")

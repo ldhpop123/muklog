@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
 
 Score = float  # -1 ~ +1
 
@@ -57,6 +59,33 @@ class Place(BaseModel):
     taste: TasteVector
     tags: list[str] = []
     revisit_total: int = 0
+    address: str | None = None
+    external_id: str | None = None
+
+
+class PlaceIn(BaseModel):
+    """식당 검색 후보를 먹로그 식당으로 등록할 때 보내는 값."""
+
+    external_id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=100)
+    category: str = Field(min_length=1, max_length=50)
+    address: str = Field(default="", max_length=200)
+    lat: float = Field(ge=33, le=39)
+    lng: float = Field(ge=124, le=132)
+
+
+class PlaceCandidate(PlaceIn):
+    # 이미 먹로그에 등록된 식당이면 그 id
+    place_id: str | None = None
+
+
+class UploadOut(BaseModel):
+    url: str
+
+
+# 업로드 API가 만든 경로만 허용한다. 외부 URL이나 다른 경로를 기록에 넣지 못하게.
+UPLOAD_URL_PATTERN = re.compile(r"^/uploads/[0-9a-f]{32}\.(jpg|png|webp|heic)$")
+MAX_PHOTOS = 4
 
 
 Visibility = Literal["private", "friends", "public"]
@@ -69,6 +98,15 @@ class RecordIn(BaseModel):
     tags: list[str] = []
     visibility: Visibility = "friends"
     inspired_by_record_id: str | None = None
+    photo_urls: list[str] = Field(default=[], max_length=MAX_PHOTOS)
+
+    @field_validator("photo_urls")
+    @classmethod
+    def _only_uploaded(cls, urls: list[str]) -> list[str]:
+        for url in urls:
+            if not UPLOAD_URL_PATTERN.match(url):
+                raise ValueError("사진은 /uploads 로 올린 것만 첨부할 수 있어요")
+        return list(dict.fromkeys(urls))
 
 
 class Record(RecordIn):

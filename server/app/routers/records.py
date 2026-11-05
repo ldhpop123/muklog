@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from .. import store
 from ..schemas import Attributes, Record, RecordIn
+from .uploads import uploaded_exists
 
 router = APIRouter(prefix="/records", tags=["records"])
 
@@ -19,6 +20,10 @@ def create_record(data: RecordIn, background: BackgroundTasks) -> Record:
             raise HTTPException(400, "내 기록을 보고 왔다고 표시할 수 없습니다")
         if source.place_id != data.place_id:
             raise HTTPException(400, "보고 온 기록과 다른 식당입니다")
+
+    missing = [u for u in data.photo_urls if not uploaded_exists(u)]
+    if missing:
+        raise HTTPException(400, "올라가지 않은 사진이 있어요. 사진을 다시 올려 주세요")
 
     record = store.add_record(store.ME_ID, data)
     # 사용자는 추출·벡터 갱신을 기다리지 않는다 (README 9.1).

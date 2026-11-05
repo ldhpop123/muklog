@@ -9,7 +9,9 @@ router = APIRouter(prefix="/recommend", tags=["recommend"])
 def excluded_by(place: Place, dislikes: list[Dislike]) -> Dislike | None:
     """불호·알레르기 항목이 식당 카테고리·태그·이름에 걸리면 그 항목을 돌려준다."""
     for d in dislikes:
-        if d.target == place.category or d.target in place.tags or d.target in place.name:
+        # 네이버 카테고리는 "순대,순댓국"처럼 쉼표로 여러 개가 붙어 온다.
+        categories = [c.strip() for c in place.category.split(",")]
+        if d.target in categories or d.target in place.tags or d.target in place.name:
             return d
     return None
 

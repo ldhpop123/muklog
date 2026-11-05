@@ -10,7 +10,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from . import extract, taste
-from .schemas import Attributes, Dislike, Place, Record, RecordIn, TasteVector, User
+from .schemas import Attributes, Dislike, Place, PlaceIn, Record, RecordIn, TasteVector, User
 
 
 def _tv(*v: float) -> TasteVector:
@@ -63,6 +63,14 @@ places: dict[str, Place] = {
               taste=_tv(0.0, -0.4, 0.9, -0.5, 0.9), tags=["데이트", "감성"], revisit_total=2),
     ]
 }
+
+# 시연 지역의 중심 좌표. 새 식당이 이 반경 안이면 해당 지역으로 묶는다.
+AREA_CENTERS: dict[str, tuple[float, float]] = {
+    "홍대": (37.5545, 126.9220),
+    "연남": (37.5620, 126.9250),
+    "상수": (37.5478, 126.9227),
+}
+AREA_RADIUS_KM = 0.8
 
 # 식당 벡터의 사전값. 리뷰 추출값이 쌓이면 이 값과 평균낸다.
 place_priors: dict[str, TasteVector] = {p.id: p.taste for p in places.values()}
@@ -288,3 +296,41 @@ def _title(counted: list[TrustEvent], user_id: str, level: str) -> str | None:
         return seed_titles.get(user_id)
     area, category = combos.most_common(1)[0][0]
     return f"{area} {category} 감별사"
+
+
+def area_for(lat: float, lng: float, address: str) -> str:
+    """가장 가까운 시연 지역(반경 안), 없으면 주소의 동·읍·면 이름, 그것도 없으면 '기타'."""
+    nearest = min(AREA_CENTERS, key=lambda a: taste.distance_km(lat, lng, *AREA_CENTERS[a]))
+    if taste.distance_km(lat, lng, *AREA_CENTERS[nearest]) <= AREA_RADIUS_KM:
+        return nearest
+    for token in address.split():
+        if token.endswith(("동", "읍", "면", "가")) and not token[0].isdigit() and len(token) > 1:
+            return token
+    return "기타"
+
+
+def find_place_by_external(external_id: str) -> Place | None:
+    return next((p for p in places.values() if p.external_id == external_id), None)
+
+
+def add_place(data: PlaceIn) -> tuple[Place, bool]:
+    """외부 검색 결과로 식당을 등록한다. 같은 external_id가 있으면 기존 식당과 False를 돌려준다.
+
+    취향 벡터 사전값은 0(중립)으로 두고, 기록이 쌓이면 리뷰 추출값으로 채워진다.
+    """
+    with lock:
+        existing = find_place_by_external(data.external_id)
+        if existing:
+            return existing, False
+        n = len(places) + 1
+        while f"p{n}" in places:
+            n += 1
+        neutral = TasteVector.from_list([0.0] * len(taste.DIMENSIONS))
+        place = Place(
+            id=f"p{n}", name=data.name, lat=data.lat, lng=data.lng, category=data.category,
+            area=area_for(data.lat, data.lng, data.address), taste=neutral,
+            address=data.address or None, external_id=data.external_id,
+        )
+        places[place.id] = place
+        place_priors[place.id] = neutral
+        return place, True

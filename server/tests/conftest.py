@@ -1,10 +1,16 @@
 import copy
+import os
+import tempfile
 
-import pytest
+# app을 import하기 전에 정해야 하는 값. 업로드는 임시 폴더에 쓰고, .env 설정과 상관없이 LLM은 끈다.
+os.environ["MUKLOG_UPLOAD_DIR"] = tempfile.mkdtemp(prefix="muklog-uploads-")
+os.environ["MUKLOG_LLM"] = "off"
 
-from app import store
+import pytest  # noqa: E402
 
-_STATE = ["users", "onboarding", "base_temps", "follows", "dislikes", "places", "records",
+from app import store  # noqa: E402
+
+_STATE = ["users", "onboarding", "base_temps", "follows", "dislikes", "places", "place_priors", "records",
           "record_attrs", "trust_events"]
 
 
