@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'config.dart';
 import 'theme.dart';
@@ -256,6 +257,48 @@ class PhotoThumb extends StatelessWidget {
             child: const Icon(Icons.broken_image_outlined, size: 20, color: Palette.inkMuted),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 먹로그 로고: 입맛 다시는 얼굴 핀 마크 + "Muklog" 글자. 원본은 design/icons/muklog-mark.svg.
+class BrandLogo extends StatelessWidget {
+  const BrandLogo({super.key, this.size = 24, this.showName = true});
+
+  /// 마크 높이
+  final double size;
+  final bool showName;
+
+  @override
+  Widget build(BuildContext context) {
+    final mark = Image.asset('assets/brand/mark.png', height: size, filterQuality: FilterQuality.medium);
+    if (!showName) return Semantics(label: 'Muklog', child: mark);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      mark,
+      SizedBox(width: size * 0.28),
+      Wordmark(size: size * 0.86),
+    ]);
+  }
+}
+
+/// "Muklog" 글자 로고. 둥글고 따뜻한 굵은 세리프(Fraunces)로, 로고에만 쓴다.
+class Wordmark extends StatelessWidget {
+  const Wordmark({super.key, this.size = 20, this.color = Palette.ink});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Muklog',
+      style: GoogleFonts.fraunces(
+        fontSize: size,
+        height: 1,
+        fontWeight: FontWeight.w800,
+        letterSpacing: size >= 24 ? -0.02 * size : -0.01 * size,
+        color: color,
       ),
     );
   }

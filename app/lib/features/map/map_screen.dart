@@ -130,7 +130,7 @@ class MapScreen extends ConsumerWidget {
       // 넓은 화면은 왼쪽 내비게이션에 이름이 있으므로 앱바를 생략한다.
       appBar: wide
           ? null
-          : AppBar(title: const Text('먹로그'), actions: [
+          : AppBar(title: const BrandLogo(size: 26), actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: FilledButton.icon(

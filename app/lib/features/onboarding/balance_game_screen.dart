@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/router.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/providers.dart';
 import '../../models/taste_vector.dart';
 
@@ -63,7 +64,7 @@ class _BalanceGameScreenState extends ConsumerState<BalanceGameScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(children: [
-                Text('먹로그', style: text.titleMedium),
+                const BrandLogo(size: 24),
                 const Spacer(),
                 Text('${_step + 1} / ${_questions.length}',
                     style: text.bodyMedium!.copyWith(fontFeatures: tabular)),

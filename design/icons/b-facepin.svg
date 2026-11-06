@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- B. 얼굴 핀: 숯불 주황 지도 핀 안에 웃는 얼굴 (친구가 다녀간 자리) -->
+  <rect width="512" height="512" rx="112" fill="#F7F2EA"/>
+  <path d="M256 70c-88 0-152 64-152 150 0 106 120 196 145 214a12 12 0 0 0 14 0c25-18 145-108 145-214 0-86-64-150-152-150z"
+        fill="#C2461A"/>
+  <circle cx="256" cy="222" r="96" fill="#FDFAF5"/>
+  <circle cx="222" cy="204" r="13" fill="#1F1A15"/>
+  <circle cx="290" cy="204" r="13" fill="#1F1A15"/>
+  <path d="M212 246c12 22 30 32 44 32s32-10 44-32" fill="none" stroke="#1F1A15" stroke-width="14" stroke-linecap="round"/>
+</svg>
