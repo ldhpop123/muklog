@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 from app import auth, store
 from app.main import app
 
-client = TestClient(app)
+# 네이버 로그인 쿠키가 콜백 주소(기본 public_url)에 묶이므로 같은 주소로 요청한다.
+client = TestClient(app, base_url="http://localhost:8010")
 
 
 class _R:
@@ -238,3 +239,42 @@ def test_naver_app_flow_exchange_with_verifier(monkeypatch):
     code = auth.create_login_code("me", auth.pkce_challenge(verifier))
     ok = client.post("/auth/exchange", json={"login_code": code, "code_verifier": verifier})
     assert ok.status_code == 200 and ok.json()["user"]["id"] == "me"
+
+
+def test_naver_callback_requires_browser_that_started(monkeypatch):
+    """공격자가 자기 challenge로 시작한 네이버 링크를 피해자가 열어도 login_code가 나가지 않는다."""
+    import secrets
+
+    monkeypatch.setenv("NAVER_LOGIN_CLIENT_ID", "nid")
+    monkeypatch.setenv("NAVER_LOGIN_CLIENT_SECRET", "nsecret")
+    attacker = TestClient(app, base_url="http://localhost:8010")
+    victim = TestClient(app, base_url="http://localhost:8010")
+    challenge = auth.pkce_challenge(secrets.token_urlsafe(48))
+    start = attacker.get("/auth/naver/start", params={"redirect": "muklog://auth", "code_challenge": challenge},
+                         follow_redirects=False)
+    assert "muklog_naver_state" in start.headers["set-cookie"]
+    assert "HttpOnly" in start.headers["set-cookie"]
+    state = httpx.URL(start.headers["location"]).params["state"]
+
+    calls = []
+    monkeypatch.setattr(httpx, "post", lambda url, data, timeout: calls.append(url) or _R(200, {"access_token": "nat"}))
+    cb = victim.get("/auth/naver/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    back = httpx.URL(cb.headers["location"])
+    assert "login_code" not in back.params and "login_error" in back.params
+    assert calls == []  # 네이버 코드도 교환하지 않는다
+    # state는 이미 소모돼서 공격자 브라우저로도 다시 쓸 수 없다.
+    assert attacker.get("/auth/naver/callback", params={"code": "c", "state": state},
+                        follow_redirects=False).status_code == 400
+
+
+def test_naver_start_moves_to_public_url(monkeypatch):
+    """다른 주소(예: ngrok)로 시작하면 쿠키를 콜백 주소에 심도록 public_url에서 다시 시작한다."""
+    monkeypatch.setenv("NAVER_LOGIN_CLIENT_ID", "nid")
+    monkeypatch.setenv("NAVER_LOGIN_CLIENT_SECRET", "nsecret")
+    other = TestClient(app, base_url="http://127.0.0.1:8010")
+    params = {"redirect": "muklog://auth", "code_challenge": "A" * 43}
+    res = other.get("/auth/naver/start", params=params, follow_redirects=False)
+    location = httpx.URL(res.headers["location"])
+    assert res.status_code == 302 and "set-cookie" not in res.headers
+    assert (location.host, location.port, location.path) == ("localhost", 8010, "/auth/naver/start")
+    assert dict(location.params) == params

@@ -1,7 +1,8 @@
+import hmac
 from typing import Annotated
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Cookie, Header, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 
 from .. import auth, store
@@ -57,8 +58,13 @@ def logout(_: CurrentUser, authorization: Annotated[str | None, Header()] = None
         auth.revoke_session(authorization.partition(" ")[2].strip())
 
 
+STATE_COOKIE = "muklog_naver_state"
+_COOKIE_PATH = "/auth/naver"
+
+
 @router.get("/naver/start")
 def naver_start(
+    request: Request,
     redirect: Annotated[str, Query(max_length=500)],
     code_challenge: Annotated[str, Query(pattern=r"^[A-Za-z0-9_-]{43}$")],
 ) -> RedirectResponse:
@@ -68,6 +74,10 @@ def naver_start(
     교환할 때 POST /auth/exchange에 code_verifier를 같이 보내야 한다. 이렇게 login_code를 시작한 앱에 묶어서
     - 로그인 CSRF(공격자가 자기 계정으로 시작한 콜백 URL을 피해자에게 열게 해 공격자 계정으로 로그인시키기)와
     - 커스텀 스킴 가로채기(다른 앱이 muklog://를 등록해 login_code를 받기)를 막는다.
+
+    PKCE는 흐름을 시작한 쪽에 묶일 뿐이라, 공격자가 자기 challenge로 시작한 네이버 URL을 피해자에게 열게 하고
+    가짜 muklog:// 앱으로 login_code를 받으면 피해자 계정으로 교환할 수 있다. 그래서 state를 HttpOnly 쿠키로도
+    시작한 브라우저에 묶고, 콜백에서 쿠키가 같은 브라우저일 때만 login_code를 준다.
     """
     if not auth.allowed_redirect(redirect):
         raise HTTPException(400, "허용되지 않은 앱 주소예요")
@@ -75,13 +85,22 @@ def naver_start(
         client_id, _ = auth.naver_keys()
     except auth.AuthUnavailable as e:
         raise HTTPException(503, str(e))
+    public = urlsplit(auth.public_url())
+    if request.url.netloc != public.netloc:
+        # 쿠키는 콜백을 받는 주소(public_url)에 심어야 하므로 그 주소에서 다시 시작한다.
+        return RedirectResponse(f"{auth.public_url()}/auth/naver/start?{request.url.query}", status_code=302)
+    state = auth.create_state(redirect, code_challenge)
     query = urlencode({
         "response_type": "code",
         "client_id": client_id,
         "redirect_uri": f"{auth.public_url()}/auth/naver/callback",
-        "state": auth.create_state(redirect, code_challenge),
+        "state": state,
     })
-    return RedirectResponse(f"{auth.NAVER_AUTHORIZE_URL}?{query}", status_code=302)
+    response = RedirectResponse(f"{auth.NAVER_AUTHORIZE_URL}?{query}", status_code=302)
+    # Lax: 네이버에서 돌아오는 최상위 GET 이동에는 쿠키가 실린다.
+    response.set_cookie(STATE_COOKIE, state, max_age=auth.STATE_TTL, path=_COOKIE_PATH,
+                        httponly=True, samesite="lax", secure=public.scheme == "https")
+    return response
 
 
 @router.get("/naver/callback")
@@ -89,6 +108,7 @@ def naver_callback(
     state: str = "",
     code: str | None = None,
     error: str | None = None,
+    started: Annotated[str | None, Cookie(alias=STATE_COOKIE)] = None,
 ) -> RedirectResponse:
     """네이버가 돌려보내는 곳. 사용자를 만들거나 찾은 뒤 앱 주소로 1회용 login_code를 붙여 보낸다.
 
@@ -99,14 +119,23 @@ def naver_callback(
         # state가 없거나 만료: 어디로 돌려보낼지 모르므로 오류만 준다(오픈 리다이렉트 방지).
         raise HTTPException(400, "로그인 요청이 만료됐어요. 다시 시도해 주세요")
     redirect, challenge = popped
+    if started is None or not hmac.compare_digest(started, state):
+        # 이 브라우저에서 시작한 로그인이 아니다(남이 보낸 로그인 링크). 네이버 코드는 교환하지 않는다.
+        return _finish(redirect, login_error="로그인을 시작한 화면이 아니에요. 앱에서 다시 로그인해 주세요")
     if error or not code:
-        return RedirectResponse(_with_query(redirect, login_error="네이버 로그인을 취소했어요"), status_code=302)
+        return _finish(redirect, login_error="네이버 로그인을 취소했어요")
     try:
         profile = auth.naver_profile(auth.naver_exchange_code(code, state))
     except (auth.AuthError, auth.AuthUnavailable) as e:
-        return RedirectResponse(_with_query(redirect, login_error=str(e)), status_code=302)
+        return _finish(redirect, login_error=str(e))
     user, _ = store.login_user(profile.provider, profile.provider_user_id, profile.nickname, profile.avatar_url)
-    return RedirectResponse(_with_query(redirect, login_code=auth.create_login_code(user.id, challenge)), status_code=302)
+    return _finish(redirect, login_code=auth.create_login_code(user.id, challenge))
+
+
+def _finish(redirect: str, **params: str) -> RedirectResponse:
+    response = RedirectResponse(_with_query(redirect, **params), status_code=302)
+    response.delete_cookie(STATE_COOKIE, path=_COOKIE_PATH)
+    return response
 
 
 def _with_query(url: str, **params: str) -> str:
