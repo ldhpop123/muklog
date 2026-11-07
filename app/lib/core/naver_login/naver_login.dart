@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../data/muklog_repository.dart';
 import '../config.dart';
@@ -20,14 +21,26 @@ Future<void> ensureNaverLoginReady(String redirect, Pkce pkce) async {
     followRedirects: false,
     validateStatus: (s) => s != null && s < 600,
     connectTimeout: const Duration(seconds: 5),
+    headers: {if (AppConfig.apiBaseUrl.contains('ngrok')) 'ngrok-skip-browser-warning': '1'},
   ));
   try {
     final res = await dio.get<dynamic>(naverStartUrl(redirect, pkce));
     if (res.statusCode == 302 || res.statusCode == 307) return;
     final detail = res.data is Map ? (res.data as Map)['detail'] : null;
     throw MuklogException(detail is String ? detail : '네이버 로그인을 시작하지 못했어요 (${res.statusCode})');
-  } on DioException {
+  } on DioException catch (e) {
+    // 웹 브라우저는 302를 막을 수 없어 네이버까지 따라가고, 네이버가 CORS를 막아 응답 없이 실패한다.
+    // 이때는 서버가 살아 있으면 302를 준 것으로 본다.
+    if (kIsWeb && e.response == null && await _serverUp(dio)) return;
     throw const MuklogException('서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요');
+  }
+}
+
+Future<bool> _serverUp(Dio dio) async {
+  try {
+    return (await dio.get<dynamic>('${AppConfig.apiBaseUrl}/health')).statusCode == 200;
+  } on DioException {
+    return false;
   }
 }
 
