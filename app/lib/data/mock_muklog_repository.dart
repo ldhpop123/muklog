@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../models/auth.dart';
 import '../models/place.dart';
 import '../models/social.dart';
 import '../models/taste_vector.dart';
@@ -20,6 +21,7 @@ class MockMuklogRepository implements MuklogRepository {
         ambience: -0.6,
         value: 0.7,
         cuisine: -0.5),
+    onboarded: false, // 목 데이터는 처음 로그인하면 밸런스 게임부터
   );
 
   final _friends = const [
@@ -192,6 +194,19 @@ class MockMuklogRepository implements MuklogRepository {
   Iterable<VisitRecord> get _visible => _records.where(_canSee);
 
   @override
+  Future<AuthResult> login(SocialProvider provider, String providerToken) async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    return AuthResult(accessToken: 'mock-session-${provider.name}', user: _me, isNew: !_me.onboarded);
+  }
+
+  @override
+  Future<AuthResult> exchangeLoginCode(String loginCode, String codeVerifier) =>
+      login(SocialProvider.naver, loginCode);
+
+  @override
+  Future<void> logout() async {}
+
+  @override
   Future<UserProfile> me() async => _me;
 
   @override
@@ -277,7 +292,7 @@ class MockMuklogRepository implements MuklogRepository {
 
   @override
   Future<void> saveOnboarding(TasteVector taste) async =>
-      _me = _me.copyWith(taste: taste);
+      _me = _me.copyWith(taste: taste, onboarded: true);
 
   @override
   Future<void> createRecord(VisitRecord record) async {

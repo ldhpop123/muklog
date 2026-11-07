@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/router.dart';
+import '../../core/auth.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/providers.dart';
@@ -49,7 +49,7 @@ class _BalanceGameScreenState extends ConsumerState<BalanceGameScreen> {
     ref.invalidate(meProvider);
     ref.invalidate(recommendProvider);
     // router의 redirect가 지도 화면으로 보낸다.
-    ref.read(onboardedProvider.notifier).state = true;
+    ref.read(authProvider.notifier).markOnboarded();
   }
 
   @override

@@ -146,6 +146,7 @@ class _NaverWebMapState extends State<_NaverWebMap> {
   _NMap? _map;
   final _markers = <_NMarker>[];
   _NMarker? _meMarker;
+  web.ResizeObserver? _resize;
 
   static _NLatLng _n(LatLng p) => _NLatLng(p.lat, p.lng);
 
@@ -180,6 +181,16 @@ class _NaverWebMapState extends State<_NaverWebMap> {
         widget.onCameraIdle?.call(LatLng(c.lat().toDouble(), c.lng().toDouble()));
       }).toJS);
       _trigger(_map!, 'resize');
+      // 화면 전환 애니메이션 중에 만들어지면 컨테이너 크기가 나중에 바뀐다.
+      // 네이버 지도는 이를 모르므로 크기가 바뀔 때마다 알려 주고 가운데를 유지한다.
+      _resize = web.ResizeObserver(((JSArray<web.ResizeObserverEntry> _, web.ResizeObserver __) {
+        final map = _map;
+        if (map == null) return;
+        final c = map.getCenter();
+        _trigger(map, 'resize');
+        map.setCenter(c);
+      }).toJS)
+        ..observe(_container);
     }).toJS);
   }
 
@@ -274,6 +285,7 @@ class _NaverWebMapState extends State<_NaverWebMap> {
 
   @override
   void dispose() {
+    _resize?.disconnect();
     _meMarker?.setMap(null);
     for (final m in _markers) {
       m.setMap(null);

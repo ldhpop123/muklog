@@ -9,6 +9,7 @@ class UserProfile {
     this.trustTemp = 36.5,
     this.level = defaultLevel,
     this.title,
+    this.onboarded = true,
   });
 
   static const defaultLevel = '새내기 먹로거';
@@ -27,7 +28,10 @@ class UserProfile {
   /// 칭호. 예: "홍대 국밥 감별사"
   final String? title;
 
-  UserProfile copyWith({TasteVector? taste}) => UserProfile(
+  /// 밸런스 게임으로 첫 취향을 저장했는지. false면 로그인 후 온보딩으로 보낸다.
+  final bool onboarded;
+
+  UserProfile copyWith({TasteVector? taste, bool? onboarded}) => UserProfile(
         id: id,
         nickname: nickname,
         avatarUrl: avatarUrl,
@@ -35,6 +39,7 @@ class UserProfile {
         trustTemp: trustTemp,
         level: level,
         title: title,
+        onboarded: onboarded ?? this.onboarded,
       );
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
@@ -45,5 +50,7 @@ class UserProfile {
         trustTemp: (json['trust_temp'] as num?)?.toDouble() ?? 36.5,
         level: json['level'] as String? ?? defaultLevel,
         title: json['title'] as String?,
+        // 필드가 없는 예전 서버 응답이면 온보딩을 강제하지 않는다
+        onboarded: json['onboarded'] as bool? ?? true,
       );
 }

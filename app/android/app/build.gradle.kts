@@ -1,8 +1,19 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// --dart-define(-from-file) 값을 매니페스트에 넣는다 (카카오 로그인 리다이렉트 스킴 kakao{네이티브 앱 키}).
+// 키를 저장소 파일에 적지 않기 위해서다. Flutter는 정의값을 base64로 묶어 "dart-defines" 속성으로 넘긴다.
+val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String?)
+    ?.split(",")
+    ?.map { String(Base64.getDecoder().decode(it)) }
+    ?.filter { it.contains("=") }
+    ?.associate { it.substringBefore("=") to it.substringAfter("=") }
+    ?: emptyMap()
 
 android {
     namespace = "com.muklog.muklog"
@@ -27,6 +38,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = dartDefines["KAKAO_NATIVE_APP_KEY"] ?: ""
     }
 
     buildTypes {

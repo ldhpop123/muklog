@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 
+import '../models/auth.dart';
 import '../models/place.dart';
 import '../models/social.dart';
 import '../models/taste_vector.dart';
@@ -21,7 +22,7 @@ class ApiMuklogRepository implements MuklogRepository {
     } on DioException catch (e) {
       final data = e.response?.data;
       final detail = data is Map ? data['detail'] : null;
-      if (detail is String) throw MuklogException(detail);
+      if (detail is String) throw MuklogException(detail, statusCode: e.response?.statusCode);
       if (e.type == DioExceptionType.receiveTimeout) {
         throw const MuklogException('서버 응답이 너무 늦어요. 잠시 후 다시 시도해 주세요');
       }
@@ -50,6 +51,22 @@ class ApiMuklogRepository implements MuklogRepository {
 
   List<ScoredPlace> _scored(List<Map<String, dynamic>> rows) =>
       rows.map(ScoredPlace.fromJson).toList();
+
+  Future<AuthResult> _auth(String path, Map<String, dynamic> body) => _call(() async {
+        final res = await _dio.post<Map<String, dynamic>>(path, data: body);
+        return AuthResult.fromJson(res.data!);
+      });
+
+  @override
+  Future<AuthResult> login(SocialProvider provider, String providerToken) =>
+      _auth('/auth/login', {'provider': provider.name, 'token': providerToken});
+
+  @override
+  Future<AuthResult> exchangeLoginCode(String loginCode, String codeVerifier) =>
+      _auth('/auth/exchange', {'login_code': loginCode, 'code_verifier': codeVerifier});
+
+  @override
+  Future<void> logout() => _call(() => _dio.post('/auth/logout'));
 
   @override
   Future<UserProfile> me() async =>

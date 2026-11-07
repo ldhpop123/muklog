@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/auth.dart';
 import '../core/config.dart';
 import '../core/location.dart';
 import '../models/place.dart';
@@ -12,13 +13,28 @@ import 'muklog_repository.dart';
 
 final repositoryProvider = Provider<MuklogRepository>((ref) {
   if (AppConfig.useMock) return MockMuklogRepository();
-  return ApiMuklogRepository(Dio(BaseOptions(
+  // 세션이 바뀌면(로그인·로그아웃) 저장소를 새로 만들어, 이를 쓰는 화면 데이터가 모두 새 사용자 기준으로 다시 불린다.
+  final token = ref.watch(authTokenProvider);
+  final dio = Dio(BaseOptions(
     baseUrl: AppConfig.apiBaseUrl,
     // FastAPI의 list 쿼리는 tags=a&tags=b 형식이다.
     listFormat: ListFormat.multi,
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 10),
-  )));
+    headers: {
+      if (token != null) 'Authorization': 'Bearer $token',
+      // ngrok 무료 터널로 서버를 열었을 때 경고 페이지 대신 API 응답을 받는다 (다른 서버에서는 무시됨)
+      if (AppConfig.apiBaseUrl.contains('ngrok')) 'ngrok-skip-browser-warning': '1',
+    },
+  ));
+  dio.interceptors.add(InterceptorsWrapper(onError: (e, handler) {
+    // 세션 만료: 로그인 화면으로 돌아가게 한다 (로그인 요청 자체의 401은 화면이 이유를 보여 준다)
+    if (e.response?.statusCode == 401 && token != null && !e.requestOptions.path.startsWith('/auth/')) {
+      ref.read(authProvider.notifier).sessionExpired();
+    }
+    handler.next(e);
+  }));
+  return ApiMuklogRepository(dio);
 });
 
 final meProvider =

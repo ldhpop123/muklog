@@ -32,9 +32,8 @@ final mapFilterProvider = StateProvider<MapFilter>((ref) => const MapFilter());
 final mapPinsProvider = FutureProvider<List<MukMapPin>>((ref) async {
   final repo = ref.watch(repositoryProvider);
   final filter = ref.watch(mapFilterProvider);
-  final near = await ref.watch(searchCenterProvider.future);
-  final places = await repo.places(
-      tags: filter.tags.toList(), layer: filter.layer, near: near, radiusKm: nearbyRadiusKm);
+  // 거리와 상관없이 기록이 있는 곳은 모두 핀으로 보여 준다. 화면 밖 핀은 지도를 옮기면 보인다.
+  final places = await repo.places(tags: filter.tags.toList(), layer: filter.layer);
   final me = await ref.watch(meProvider.future);
   final authors = {
     for (final f in await ref.watch(friendsProvider.future)) f.id: f,
@@ -83,10 +82,13 @@ class MapScreen extends ConsumerWidget {
     final nearMe = ref.watch(nearMeProvider);
     final me = location?.position;
     // 내 주변 보기면 내 위치, 전체 보기면 친구 기록이 모인 곳(홍대)을 가운데에 둔다.
-    final center = nearMe && me != null ? me : defaultMapCenter;
+    // 기록을 남긴 식당처럼 옮겨 갈 곳이 있으면 그곳을 가운데에 둔다.
+    final center = ref.watch(mapFocusProvider) ?? (nearMe && me != null ? me : defaultMapCenter);
     final wide = isWide(context);
     final map = Stack(children: [
+      // 다시 불러오는 동안(이 지역 보기·기록 뒤)에도 지도를 그대로 둔다. 새로 만들면 처음 위치로 돌아간다.
       pins.when(
+        skipLoadingOnReload: true,
         data: (pins) => MukMap(
           pins: pins,
           onPinTap: (id) => context.push('/place/$id'),
@@ -118,6 +120,7 @@ class MapScreen extends ConsumerWidget {
           backgroundColor: Palette.card,
           foregroundColor: Palette.ink,
           onPressed: () {
+            moveMapArea(ref, null);
             ref.read(nearMeProvider.notifier).state = true;
             ref.invalidate(myLocationProvider);
           },
@@ -211,14 +214,15 @@ class _LocationBanner extends ConsumerWidget {
     VoidCallback? onAction;
     if (location != null && location!.position == null) {
       message = '${location!.reason} · 홍대 기준으로 보여 드려요';
-    } else if (location != null && nearMe && empty) {
-      message = '내 주변 ${nearbyRadiusKm.toStringAsFixed(0)}km 안에 친구 기록이 없어요';
-      action = '전체 보기';
-      onAction = () => ref.read(nearMeProvider.notifier).state = false;
+    } else if (empty) {
+      message = '아직 지도에 남긴 기록이 없어요';
     } else if (!nearMe) {
       message = '친구 기록 전체를 보고 있어요';
       action = '내 주변';
-      onAction = () => ref.read(nearMeProvider.notifier).state = true;
+      onAction = () {
+        moveMapArea(ref, null);
+        ref.read(nearMeProvider.notifier).state = true;
+      };
     }
     if (message == null) return const SizedBox.shrink();
     return Align(

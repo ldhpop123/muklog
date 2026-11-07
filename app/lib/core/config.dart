@@ -17,4 +17,9 @@ class AppConfig {
   /// 웹 전용: 네이버 지도 Style Editor에서 POI(장소 라벨)를 끈 커스텀 스타일의 Metadata ID.
   /// 웹 기본 지도는 장소 이름이 타일에 박혀 있어, 친구 핀만 보이게 하려면 이 스타일이 필요하다.
   static const naverMapStyleId = String.fromEnvironment('NAVER_MAP_STYLE_ID');
+
+  /// 카카오 로그인 (developers.kakao.com > 앱 키). 앱에 넣어도 되는 공개 키다.
+  static const kakaoNativeAppKey = String.fromEnvironment('KAKAO_NATIVE_APP_KEY');
+  static const kakaoJsAppKey = String.fromEnvironment('KAKAO_JS_APP_KEY');
+  static bool get hasKakao => kakaoNativeAppKey.isNotEmpty || kakaoJsAppKey.isNotEmpty;
 }

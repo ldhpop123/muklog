@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/providers.dart';
@@ -16,7 +17,14 @@ class ProfileScreen extends ConsumerWidget {
     final friends = ref.watch(friendsProvider).valueOrNull ?? [];
     final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('프로필')),
+      appBar: AppBar(title: const Text('프로필'), actions: [
+        TextButton(
+          onPressed: () => ref.read(authProvider.notifier).logout(),
+          style: TextButton.styleFrom(foregroundColor: Palette.inkSoft),
+          child: const Text('로그아웃'),
+        ),
+        const SizedBox(width: 8),
+      ]),
       body: me.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('프로필을 불러오지 못했어요. $e')),
