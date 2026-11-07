@@ -47,6 +47,8 @@ class User(BaseModel):
     trust_temp: float = 36.5
     title: str | None = None
     level: str = "새내기 먹로거"
+    # 밸런스 게임으로 취향을 저장했는지. false면 앱이 로그인 후 온보딩으로 보낸다.
+    onboarded: bool = True
 
 
 class Place(BaseModel):
@@ -188,3 +190,25 @@ class AreaSummary(BaseModel):
     lng: float
     distance_km: float
     record_count: int
+
+
+Provider = Literal["kakao", "naver", "google"]
+
+
+class LoginIn(BaseModel):
+    provider: Provider
+    # kakao: 액세스 토큰, google: ID 토큰. naver는 400(/auth/naver/start 사용)
+    token: str = Field(min_length=1, max_length=4096)
+
+
+class ExchangeIn(BaseModel):
+    login_code: str = Field(min_length=1, max_length=200)
+    # /auth/naver/start에 보낸 code_challenge의 원본 값(PKCE)
+    code_verifier: str = Field(min_length=43, max_length=128)
+
+
+class LoginOut(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    user: User
+    is_new: bool

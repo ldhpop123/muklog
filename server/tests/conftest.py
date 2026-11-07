@@ -8,12 +8,16 @@ import tempfile
 os.environ["MUKLOG_UPLOAD_DIR"] = tempfile.mkdtemp(prefix="muklog-uploads-")
 atexit.register(shutil.rmtree, os.environ["MUKLOG_UPLOAD_DIR"], ignore_errors=True)
 os.environ["MUKLOG_LLM"] = "off"
+# 기존 테스트는 헤더 없이 시드 사용자 "me"로 동작한다. 인증 테스트는 이 값을 직접 끈다.
+os.environ["MUKLOG_DEV_AUTH"] = "1"
+# SQLite 저장은 끈다. 저장 테스트는 임시 파일로 직접 켠다.
+os.environ["MUKLOG_DB"] = ""
 
 import pytest  # noqa: E402
 
 from app import store  # noqa: E402
 
-_STATE = ["users", "onboarding", "base_temps", "follows", "dislikes", "places", "place_priors", "records",
+_STATE = ["accounts", "users", "onboarding", "base_temps", "follows", "dislikes", "places", "place_priors", "records",
           "record_attrs", "trust_events"]
 
 

@@ -6,6 +6,8 @@ from fastapi import APIRouter, Query
 from .. import areas, naver, store
 from ..schemas import AreaSummary
 
+from ..auth import CurrentUser
+
 router = APIRouter(prefix="/areas", tags=["areas"])
 
 AREA_WITHIN_KM = 3.0  # 이보다 먼 상권은 주변으로 보지 않는다
@@ -14,6 +16,7 @@ DONG_FIRST_KM = 1.0  # 이 안에 상권이 없으면 행정동을 맨 앞에 �
 
 @router.get("")
 def nearby_areas(
+    me_id: CurrentUser,
     lat: Annotated[float, Query(ge=-90, le=90)],
     lng: Annotated[float, Query(ge=-180, le=180)],
     limit: Annotated[int, Query(ge=1, le=30)] = 5,
@@ -24,8 +27,8 @@ def nearby_areas(
     - 행정동은 역지오코딩 키(NAVER_MAP_CLIENT_ID/SECRET)가 있을 때만 넣는다. lat·lng는 지도 가운데 좌표.
     - record_count는 내가 볼 수 있는 친구 기록 수(0 포함). 상권은 소속 규칙, 행정동은 Place.dong 기준.
     """
-    friend_ids = store.follows.get(store.ME_ID, set())
-    friend_records = [r for r in store.visible_records(store.ME_ID) if r.user_id in friend_ids]
+    friend_ids = store.follows.get(me_id, set())
+    friend_records = [r for r in store.visible_records(me_id) if r.user_id in friend_ids]
     area_counts = Counter(areas.area_of(store.places[r.place_id].lat, store.places[r.place_id].lng)
                           for r in friend_records)
 

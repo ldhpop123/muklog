@@ -3,6 +3,8 @@ from fastapi import APIRouter, HTTPException
 from .. import store, taste
 from ..schemas import Dislike, PartyRequest, Place, ScoredPlace, User
 
+from ..auth import CurrentUser
+
 router = APIRouter(prefix="/recommend", tags=["recommend"])
 
 
@@ -52,14 +54,14 @@ def scored_for(me: User, lat: float | None = None, lng: float | None = None) -> 
 
 
 @router.get("")
-def recommend(lat: float | None = None, lng: float | None = None) -> list[ScoredPlace]:
+def recommend(me_id: CurrentUser, lat: float | None = None, lng: float | None = None) -> list[ScoredPlace]:
     """개인화 추천 리스트. lat·lng을 주면 거리 감쇠를 Context 보정으로 곱한다."""
     if (lat is None) != (lng is None):
         raise HTTPException(422, "lat과 lng은 함께 보내야 합니다")
-    return scored_for(store.users[store.ME_ID], lat, lng)
+    return scored_for(store.users[me_id], lat, lng)
 
 
-def _party_reason(members: list[User], place: Place) -> str:
+def _party_reason(me_id: str, members: list[User], place: Place) -> str:
     """구성원마다 이 식당과 가장 잘 맞는 취향 차원을 골라 문장으로 만든다 (README 6.5 설명)."""
     pv = place.taste.as_list()
     parts = []
@@ -69,7 +71,7 @@ def _party_reason(members: list[User], place: Place) -> str:
         if mv[d] * pv[d] < 0.1:
             continue
         low, high = taste.DIMENSION_LABELS[taste.DIMENSIONS[d]]
-        who = "나" if m.id == store.ME_ID else f"{m.nickname}님"
+        who = "나" if m.id == me_id else f"{m.nickname}님"
         parts.append(f"{who}의 {high if pv[d] > 0 else low} 취향")
     if not parts:
         return "모두에게 무난한 곳"
@@ -79,14 +81,14 @@ def _party_reason(members: list[User], place: Place) -> str:
 
 
 @router.post("/party")
-def party(req: PartyRequest) -> list[ScoredPlace]:
+def party(me_id: CurrentUser, req: PartyRequest) -> list[ScoredPlace]:
     """파티 모드 교집합 추천 (README 6.5)."""
     # 친구만 파티에 넣을 수 있다. 아무 사용자 ID로 남의 취향을 떠보지 못하게 막는다.
-    friend_ids = store.follows.get(store.ME_ID, set())
-    not_friends = [i for i in req.member_ids if i != store.ME_ID and i not in friend_ids]
+    friend_ids = store.follows.get(me_id, set())
+    not_friends = [i for i in req.member_ids if i != me_id and i not in friend_ids]
     if not_friends:
         raise HTTPException(403, f"친구가 아닌 사용자: {not_friends}")
-    members = [store.users[store.ME_ID], *(store.users[i] for i in dict.fromkeys(req.member_ids) if i != store.ME_ID)]
+    members = [store.users[me_id], *(store.users[i] for i in dict.fromkeys(req.member_ids) if i != me_id)]
     vectors = [m.taste.as_list() for m in members]
     # 한 명이라도 불호·알레르기로 등록한 식당은 후보에서 뺀다. 누가 싫어하는지는 밝히지 않는다.
     group_dislikes = [d for m in members for d in store.dislikes.get(m.id, [])]
@@ -98,6 +100,6 @@ def party(req: PartyRequest) -> list[ScoredPlace]:
         results.append(ScoredPlace(
             place=place,
             score=taste.party_score(vectors, place.taste.as_list()),
-            reason=_party_reason(members, place),
+            reason=_party_reason(me_id, members, place),
         ))
     return sorted(results, key=lambda s: s.score, reverse=True)

@@ -3,48 +3,50 @@ from fastapi import APIRouter, HTTPException
 from .. import store, taste
 from ..schemas import Coupling, DimensionDiff, Dislike, Record, ScoredPlace, TasteVector, User
 
+from ..auth import CurrentUser
+
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/me")
-def me() -> User:
-    return store.users[store.ME_ID]
+def me(me_id: CurrentUser) -> User:
+    return store.users[me_id]
 
 
 @router.get("/me/friends")
-def my_friends() -> list[User]:
-    return store.friends_of(store.ME_ID)
+def my_friends(me_id: CurrentUser) -> list[User]:
+    return store.friends_of(me_id)
 
 
 @router.put("/me/taste")
-def save_onboarding_taste(vector: TasteVector) -> User:
+def save_onboarding_taste(me_id: CurrentUser, vector: TasteVector) -> User:
     """밸런스 게임 결과로 초기 취향 벡터를 저장한다. 기록이 있으면 기록과 섞어 다시 계산한다."""
-    return store.set_onboarding(store.ME_ID, vector)
+    return store.set_onboarding(me_id, vector)
 
 
 @router.get("/me/dislikes")
-def my_dislikes() -> list[Dislike]:
-    return store.dislikes.get(store.ME_ID, [])
+def my_dislikes(me_id: CurrentUser) -> list[Dislike]:
+    return store.dislikes.get(me_id, [])
 
 
 @router.put("/me/dislikes")
-def save_dislikes(items: list[Dislike]) -> list[Dislike]:
+def save_dislikes(me_id: CurrentUser, items: list[Dislike]) -> list[Dislike]:
     """불호·알레르기 목록 전체를 바꾼다. 같은 항목은 하나로 합친다."""
     unique = list({(d.target.strip(), d.kind): Dislike(target=d.target.strip(), kind=d.kind) for d in items}.values())
-    store.dislikes[store.ME_ID] = unique
+    store.dislikes[me_id] = unique
     return unique
 
 
 @router.get("/{user_id}/couple")
-def couple(user_id: str) -> Coupling:
+def couple(me_id: CurrentUser, user_id: str) -> Coupling:
     """입맛 커플링 지수와 차원별 비교 (README 6.3, 친구 비교 화면). 친구만 조회할 수 있다."""
-    if user_id not in store.follows.get(store.ME_ID, set()):
+    if user_id not in store.follows.get(me_id, set()):
         raise HTTPException(403, "친구의 입맛만 비교할 수 있습니다")
-    me_u, them = store.users[store.ME_ID], store.users[user_id]
+    me_u, them = store.users[me_id], store.users[user_id]
     me_v, them_v = me_u.taste.as_list(), them.taste.as_list()
 
-    visible = store.visible_records(store.ME_ID)
-    my_ratings = _avg_ratings([r for r in visible if r.user_id == store.ME_ID])
+    visible = store.visible_records(me_id)
+    my_ratings = _avg_ratings([r for r in visible if r.user_id == me_id])
     their_ratings = _avg_ratings([r for r in visible if r.user_id == user_id])
     shared = sorted(my_ratings.keys() & their_ratings.keys())
     percent = taste.couple_percent_with_ratings(

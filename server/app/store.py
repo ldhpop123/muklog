@@ -3,6 +3,8 @@
 TODO(db): README 10장 스키마로 PostgreSQL 이관. 함수 시그니처는 유지한다.
 """
 
+import os
+import secrets
 import threading
 from collections import Counter
 from datetime import datetime
@@ -17,7 +19,7 @@ def _tv(*v: float) -> TasteVector:
     return TasteVector(saltiness=v[0], spiciness=v[1], ambience=v[2], value=v[3], cuisine=v[4])
 
 
-ME_ID = "me"  # TODO(auth): 카카오 로그인 후 토큰에서 사용자 식별
+ME_ID = "me"  # 개발용 시드 사용자. MUKLOG_DEV_AUTH=1이고 Authorization 헤더가 없을 때 쓴다(auth.current_user).
 
 # 기록 처리(백그라운드)와 요청 처리가 같은 dict를 만지므로 갱신은 이 락 안에서 한다.
 lock = threading.Lock()
@@ -26,7 +28,7 @@ users: dict[str, User] = {
     u.id: u
     for u in [
         User(id="me", nickname="나", avatar_url="https://api.dicebear.com/9.x/thumbs/png?seed=me",
-             taste=_tv(-0.4, 0.3, -0.6, 0.7, -0.5)),
+             taste=_tv(-0.4, 0.3, -0.6, 0.7, -0.5), onboarded=False),
         User(id="u1", nickname="민수", avatar_url="https://api.dicebear.com/9.x/thumbs/png?seed=minsu",
              taste=_tv(-0.5, 0.2, -0.8, 0.6, -0.6), trust_temp=42.1, title="홍대 국밥 감별사", level="지역 감별사"),
         User(id="u2", nickname="지은", avatar_url="https://api.dicebear.com/9.x/thumbs/png?seed=jieun",
@@ -44,6 +46,9 @@ base_temps: dict[str, float] = {u.id: u.trust_temp for u in users.values()}
 seed_titles: dict[str, str] = {u.id: u.title for u in users.values() if u.title}
 
 follows: dict[str, set[str]] = {"me": {"u1", "u2", "u3"}}
+
+# 소셜 계정 → 먹로그 사용자. (provider, provider_user_id) → user_id
+accounts: dict[tuple[str, str], str] = {}
 
 dislikes: dict[str, list[Dislike]] = {
     "u2": [Dislike(target="국밥", kind="불호")],
@@ -217,7 +222,52 @@ def set_onboarding(user_id: str, vector: TasteVector) -> User:
     with lock:
         onboarding[user_id] = vector
         refresh_user_taste(user_id)
+        users[user_id] = users[user_id].model_copy(update={"onboarded": True})
         return users[user_id]
+
+
+def login_user(provider: str, provider_user_id: str, nickname: str | None, avatar_url: str | None) -> tuple[User, bool]:
+    """소셜 계정으로 사용자를 찾고, 없으면 만든다. 닉네임·사진은 처음 가입할 때만 채운다.
+
+    MUKLOG_DEMO=1이면 모든 사용자가 서로 팔로우한다(시연용, 친구 추가 기능 전까지). 비공개 기록은 여전히 본인만 본다.
+    """
+    with lock:
+        existing = accounts.get((provider, provider_user_id))
+        if existing and existing in users:
+            return users[existing], False
+        user_id = f"u-{secrets.token_hex(6)}"
+        neutral = TasteVector.from_list([0.0] * len(taste.DIMENSIONS))
+        user = User(
+            id=user_id,
+            nickname=(nickname or "").strip()[:20] or "먹로거",
+            avatar_url=avatar_url or f"https://api.dicebear.com/9.x/thumbs/png?seed={user_id}",
+            taste=neutral,
+            onboarded=False,
+        )
+        users[user_id] = user
+        onboarding[user_id] = neutral
+        base_temps[user_id] = taste.BASE_TEMP
+        accounts[(provider, provider_user_id)] = user_id
+        follows[user_id] = set()
+        if demo_mode():
+            _connect_all()
+        return user, True
+
+
+def demo_mode() -> bool:
+    return os.getenv("MUKLOG_DEMO") == "1"
+
+
+def _connect_all() -> None:
+    """모든 사용자가 서로를 팔로우하게 한다. 락 안에서 부른다."""
+    for uid in users:
+        follows.setdefault(uid, set()).update(other for other in users if other != uid)
+
+
+def connect_all_users() -> None:
+    """시연 모드: 이미 가입한 사용자까지 모두 서로 팔로우하게 채운다(서버 시작 때 한 번)."""
+    with lock:
+        _connect_all()
 
 
 def _add_trust_event(visit: Record) -> None:

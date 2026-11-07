@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from .. import naver, store, taste
 from ..schemas import Place, PlaceCandidate, PlaceIn, Record
 
+from ..auth import CurrentUser
+
 router = APIRouter(prefix="/places", tags=["places"])
 
 
@@ -28,6 +30,7 @@ def in_bbox(p: Place, box: tuple[float, float, float, float] | None) -> bool:
 
 @router.get("")
 def list_places(
+    me_id: CurrentUser,
     bbox: str | None = None,
     tags: Annotated[list[str] | None, Query()] = None,
     layer: Literal["all", "friends", "mine"] = "all",
@@ -42,8 +45,8 @@ def list_places(
     if layer == "all":
         allowed = None
     else:
-        authors = {store.ME_ID} if layer == "mine" else set(store.follows.get(store.ME_ID, set()))
-        allowed = {r.place_id for r in store.visible_records(store.ME_ID) if r.user_id in authors}
+        authors = {me_id} if layer == "mine" else set(store.follows.get(me_id, set()))
+        allowed = {r.place_id for r in store.visible_records(me_id) if r.user_id in authors}
 
     return [
         p for p in store.places.values()
@@ -55,6 +58,7 @@ def list_places(
 
 @router.get("/search")
 def search_places(
+    me_id: CurrentUser,
     query: Annotated[str, Query(min_length=1, max_length=50)],
     lat: float | None = None,
     lng: float | None = None,
@@ -87,7 +91,7 @@ def search_places(
 
 
 @router.post("", status_code=201)
-def create_place(data: PlaceIn, response: Response) -> Place:
+def create_place(me_id: CurrentUser, data: PlaceIn, response: Response) -> Place:
     """검색 후보를 먹로그 식당으로 등록한다. 이미 있는 external_id면 기존 식당을 200으로 돌려준다.
 
     이름·주소·좌표는 클라이언트가 보낸 값이 아니라 서버가 검색 때 받은 값을 쓴다(위조 방지).
@@ -106,7 +110,7 @@ def create_place(data: PlaceIn, response: Response) -> Place:
 
 
 @router.get("/{place_id}/records")
-def place_records(place_id: str) -> list[Record]:
+def place_records(me_id: CurrentUser, place_id: str) -> list[Record]:
     if place_id not in store.places:
         raise HTTPException(404, "식당을 찾을 수 없습니다")
-    return [r for r in store.visible_records(store.ME_ID) if r.place_id == place_id]
+    return [r for r in store.visible_records(me_id) if r.place_id == place_id]
