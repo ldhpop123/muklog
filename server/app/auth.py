@@ -243,7 +243,8 @@ def naver_exchange_code(code: str, state: str) -> str:
 
 def public_url() -> str:
     """이 서버의 외부 주소. 네이버 콘솔의 Callback URL은 {public_url}/auth/naver/callback으로 등록한다."""
-    return os.getenv("MUKLOG_PUBLIC_URL", "http://localhost:8010").rstrip("/")
+    # .env.example을 그대로 복사하면 빈 값("")이 들어오므로 빈 값도 기본값으로 본다.
+    return (os.getenv("MUKLOG_PUBLIC_URL") or "http://localhost:8010").rstrip("/")
 
 
 DEFAULT_LOGIN_REDIRECTS = "http://localhost:8765,http://127.0.0.1:8765,muklog://auth"
@@ -257,7 +258,7 @@ def allowed_redirect(url: str) -> bool:
     """
     from urllib.parse import urlsplit
 
-    allowed = os.getenv("MUKLOG_LOGIN_REDIRECTS", DEFAULT_LOGIN_REDIRECTS)
+    allowed = os.getenv("MUKLOG_LOGIN_REDIRECTS") or DEFAULT_LOGIN_REDIRECTS
     origins = {o.strip().rstrip("/") for o in allowed.split(",") if o.strip()}
     try:
         parts = urlsplit(url)

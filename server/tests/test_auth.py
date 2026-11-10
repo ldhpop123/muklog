@@ -278,3 +278,17 @@ def test_naver_start_moves_to_public_url(monkeypatch):
     assert res.status_code == 302 and "set-cookie" not in res.headers
     assert (location.host, location.port, location.path) == ("localhost", 8010, "/auth/naver/start")
     assert dict(location.params) == params
+
+
+def test_blank_env_values_fall_back_to_defaults(monkeypatch):
+    """.env.example을 그대로 복사해 MUKLOG_PUBLIC_URL=, MUKLOG_LOGIN_REDIRECTS=가 빈 값이어도 네이버 로그인이 시작된다."""
+    monkeypatch.setenv("NAVER_LOGIN_CLIENT_ID", "nid")
+    monkeypatch.setenv("NAVER_LOGIN_CLIENT_SECRET", "nsecret")
+    monkeypatch.setenv("MUKLOG_PUBLIC_URL", "")
+    monkeypatch.setenv("MUKLOG_LOGIN_REDIRECTS", "")
+    assert auth.public_url() == "http://localhost:8010"
+    assert auth.allowed_redirect("muklog://auth")
+    res = client.get("/auth/naver/start", params={"redirect": "muklog://auth", "code_challenge": "A" * 43},
+                     follow_redirects=False)
+    assert res.status_code == 302
+    assert httpx.URL(res.headers["location"]).host == "nid.naver.com"
