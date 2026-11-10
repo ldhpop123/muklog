@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -32,14 +34,51 @@ class MockSocialSignIn implements SocialSignIn {
   Future<void> signOut(SocialProvider provider) async {}
 }
 
+Future<void>? _googleReady;
+
+/// 구글 로그인 준비. 웹은 로그인 화면에서 구글 버튼을 그리기 전에 불러야 한다.
+/// Android·iOS는 serverClientId(웹 클라이언트 ID)를 대상으로 한 ID 토큰을 받아 서버가 검증한다.
+Future<void> initGoogleSignIn() => _googleReady ??= GoogleSignIn.instance.initialize(
+      clientId: kIsWeb
+          ? AppConfig.googleWebClientId
+          : defaultTargetPlatform == TargetPlatform.iOS && AppConfig.googleIosClientId.isNotEmpty
+              ? AppConfig.googleIosClientId
+              : null,
+      serverClientId: kIsWeb ? null : AppConfig.googleWebClientId,
+    );
+
+/// 웹: 구글 버튼으로 로그인했을 때 받는 ID 토큰.
+Stream<String> googleWebIdTokens() => GoogleSignIn.instance.authenticationEvents
+    .where((e) => e is GoogleSignInAuthenticationEventSignIn)
+    .map((e) => (e as GoogleSignInAuthenticationEventSignIn).user.authentication.idToken)
+    .where((t) => t != null)
+    .cast<String>();
+
 /// 실제 SDK 로그인. 네이버는 이 경로를 쓰지 않는다 (서버 리다이렉트 + PKCE, naver_login/).
-/// TODO(auth): 구글 키가 준비되면 google_sign_in 연결.
+/// 웹 구글도 쓰지 않는다 (구글 버튼 → [googleWebIdTokens]).
 class SdkSocialSignIn implements SocialSignIn {
   @override
   Future<String> obtainToken(SocialProvider provider) => switch (provider) {
         SocialProvider.kakao => _kakao(),
+        SocialProvider.google => _google(),
         _ => throw MuklogException('${provider.label} 로그인 설정이 아직 안 되어 있어요. 앱에 로그인 키를 넣어 주세요'),
       };
+
+  Future<String> _google() async {
+    if (!AppConfig.hasGoogle) {
+      throw const MuklogException('구글 로그인 설정이 아직 안 되어 있어요. 앱에 구글 키를 넣어 주세요');
+    }
+    try {
+      await initGoogleSignIn();
+      final account = await GoogleSignIn.instance.authenticate();
+      final token = account.authentication.idToken;
+      if (token == null) throw const MuklogException('구글 로그인 결과를 받지 못했어요. 다시 시도해 주세요');
+      return token;
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) throw const MuklogException('구글 로그인을 취소했어요');
+      throw MuklogException('구글 로그인을 하지 못했어요 (${e.code.name}${e.description == null ? '' : ': ${e.description}'})');
+    }
+  }
 
   /// 카카오톡이 있으면 카카오톡으로, 없거나 실패하면 카카오 계정(브라우저)으로 로그인한다.
   Future<String> _kakao() async {
@@ -71,6 +110,14 @@ class SdkSocialSignIn implements SocialSignIn {
 
   @override
   Future<void> signOut(SocialProvider provider) async {
+    if (provider == SocialProvider.google && AppConfig.hasGoogle) {
+      try {
+        await initGoogleSignIn();
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {
+        // 구글 쪽 로그아웃이 실패해도 먹로그 로그아웃은 진행한다
+      }
+    }
     if (provider == SocialProvider.kakao && AppConfig.hasKakao) {
       try {
         await UserApi.instance.logout();
@@ -129,6 +176,13 @@ class AuthNotifier extends AsyncNotifier<UserProfile?> {
     });
     // 실패하면 이전 상태(보통 로그아웃)로 두고, 화면은 state.error로 이유를 보여 준다
     if (state.hasError && previous != null) state = AsyncData(previous);
+  }
+
+  /// 웹 구글 버튼으로 받은 ID 토큰으로 로그인한다.
+  Future<void> loginWithGoogleIdToken(String idToken) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async =>
+        _finish(await ref.read(repositoryProvider).login(SocialProvider.google, idToken), SocialProvider.google));
   }
 
   Future<UserProfile> _finish(

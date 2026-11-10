@@ -22,4 +22,10 @@ class AppConfig {
   static const kakaoNativeAppKey = String.fromEnvironment('KAKAO_NATIVE_APP_KEY');
   static const kakaoJsAppKey = String.fromEnvironment('KAKAO_JS_APP_KEY');
   static bool get hasKakao => kakaoNativeAppKey.isNotEmpty || kakaoJsAppKey.isNotEmpty;
+
+  /// 구글 로그인 (Cloud Console > OAuth 클라이언트 ID). 웹 클라이언트 ID는 웹 로그인과,
+  /// Android·iOS에서 서버가 검증할 ID 토큰의 대상(serverClientId)으로 쓴다.
+  static const googleWebClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+  static const googleIosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
+  static bool get hasGoogle => googleWebClientId.isNotEmpty;
 }

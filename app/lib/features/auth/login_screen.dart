@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth.dart';
+import '../../core/config.dart';
+import '../../core/google_login/google_button.dart';
 import '../../core/widgets.dart';
 import '../../models/auth.dart';
 
@@ -18,17 +22,45 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   SocialProvider? _busy;
 
-  Future<void> _login(SocialProvider p) async {
+  /// 웹은 구글이 그려 주는 버튼을 쓴다. 준비(initialize)가 끝나야 그릴 수 있다.
+  static final _googleOnWeb = kIsWeb && !AppConfig.useMock && AppConfig.hasGoogle;
+  Future<void>? _googleReady;
+  StreamSubscription<String>? _googleTokens;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_googleOnWeb) {
+      _googleReady = initGoogleSignIn();
+      _googleTokens = googleWebIdTokens().listen(
+        (token) => _run(SocialProvider.google, () => ref.read(authProvider.notifier).loginWithGoogleIdToken(token)),
+        onError: (Object e) => _showError('구글 로그인을 하지 못했어요 ($e)'),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _googleTokens?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _login(SocialProvider p) => _run(p, () => ref.read(authProvider.notifier).login(p));
+
+  Future<void> _run(SocialProvider p, Future<void> Function() action) async {
     if (_busy != null) return;
     setState(() => _busy = p);
-    await ref.read(authProvider.notifier).login(p);
+    await action();
     if (!mounted) return;
     setState(() => _busy = null);
     final error = ref.read(authProvider).error;
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
-    }
+    if (error != null) _showError('$error');
     // 성공하면 router의 redirect가 온보딩이나 지도로 보낸다
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -65,11 +97,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onTap: () => _login(SocialProvider.naver),
                 ),
                 const SizedBox(height: 10),
-                _SocialButton(
-                  provider: SocialProvider.google,
-                  busy: _busy == SocialProvider.google,
-                  onTap: () => _login(SocialProvider.google),
-                ),
+                if (_googleOnWeb)
+                  SizedBox(
+                    height: 52,
+                    child: _busy == SocialProvider.google
+                        ? const Center(child: SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+                        : FutureBuilder(
+                            future: _googleReady,
+                            builder: (context, snap) => snap.connectionState != ConnectionState.done
+                                ? const SizedBox.shrink()
+                                : LayoutBuilder(
+                                    builder: (context, c) =>
+                                        Center(child: googleWebButton(math.min(c.maxWidth, 400)))),
+                          ),
+                  )
+                else
+                  _SocialButton(
+                    provider: SocialProvider.google,
+                    busy: _busy == SocialProvider.google,
+                    onTap: () => _login(SocialProvider.google),
+                  ),
                 const SizedBox(height: 20),
                 Text('처음이면 고른 계정으로 바로 가입돼요. 닉네임과 프로필 사진만 가져와요',
                     textAlign: TextAlign.center, style: text.bodySmall),
