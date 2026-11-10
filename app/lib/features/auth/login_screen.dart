@@ -30,6 +30,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    // 웹 네이버 로그인처럼 페이지가 새로 열리며 실패한 경우(취소·만료 등), 오류를 안고 이 화면으로 온다
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final error = ref.read(authProvider).error;
+      if (error != null && _busy == null) _showError('$error');
+    });
     if (_googleOnWeb) {
       _googleReady = initGoogleSignIn();
       _googleTokens = googleWebIdTokens().listen(
