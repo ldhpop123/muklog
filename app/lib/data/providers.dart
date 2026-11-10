@@ -23,8 +23,6 @@ final repositoryProvider = Provider<MuklogRepository>((ref) {
     receiveTimeout: const Duration(seconds: 10),
     headers: {
       if (token != null) 'Authorization': 'Bearer $token',
-      // ngrok 무료 터널로 서버를 열었을 때 경고 페이지 대신 API 응답을 받는다 (다른 서버에서는 무시됨)
-      if (AppConfig.apiBaseUrl.contains('ngrok')) 'ngrok-skip-browser-warning': '1',
     },
   ));
   dio.interceptors.add(InterceptorsWrapper(onError: (e, handler) {

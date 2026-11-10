@@ -21,7 +21,6 @@ Future<void> ensureNaverLoginReady(String redirect, Pkce pkce) async {
     followRedirects: false,
     validateStatus: (s) => s != null && s < 600,
     connectTimeout: const Duration(seconds: 5),
-    headers: {if (AppConfig.apiBaseUrl.contains('ngrok')) 'ngrok-skip-browser-warning': '1'},
   ));
   try {
     final res = await dio.get<dynamic>(naverStartUrl(redirect, pkce));

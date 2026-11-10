@@ -85,7 +85,7 @@ extension type _MarkerOptions._(JSObject _) implements JSObject {
 bool get _useCustomStyle => AppConfig.naverMapStyleId.isNotEmpty;
 
 /// index.html을 고치지 않도록 Client ID를 넣은 SDK 스크립트를 런타임에 붙인다.
-/// 네이버 지도 인증 실패 여부. 콘솔에 등록하지 않은 주소(예: 매번 바뀌는 ngrok 주소)로 열면 true가 되고,
+/// 네이버 지도 인증 실패 여부. 콘솔에 등록하지 않은 주소로 열면 true가 되고,
 /// 지도는 임시 지도로 바뀐다.
 final _authFailed = ValueNotifier(false);
 
