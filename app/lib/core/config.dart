@@ -17,4 +17,15 @@ class AppConfig {
   /// 웹 전용: 네이버 지도 Style Editor에서 POI(장소 라벨)를 끈 커스텀 스타일의 Metadata ID.
   /// 웹 기본 지도는 장소 이름이 타일에 박혀 있어, 친구 핀만 보이게 하려면 이 스타일이 필요하다.
   static const naverMapStyleId = String.fromEnvironment('NAVER_MAP_STYLE_ID');
+
+  /// 카카오 로그인 (developers.kakao.com > 앱 키). 앱에 넣어도 되는 공개 키다.
+  static const kakaoNativeAppKey = String.fromEnvironment('KAKAO_NATIVE_APP_KEY');
+  static const kakaoJsAppKey = String.fromEnvironment('KAKAO_JS_APP_KEY');
+  static bool get hasKakao => kakaoNativeAppKey.isNotEmpty || kakaoJsAppKey.isNotEmpty;
+
+  /// 구글 로그인 (Cloud Console > OAuth 클라이언트 ID). 웹 클라이언트 ID는 웹 로그인과,
+  /// Android·iOS에서 서버가 검증할 ID 토큰의 대상(serverClientId)으로 쓴다.
+  static const googleWebClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+  static const googleIosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
+  static bool get hasGoogle => googleWebClientId.isNotEmpty;
 }

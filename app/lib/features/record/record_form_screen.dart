@@ -10,6 +10,7 @@ import '../../data/muklog_repository.dart';
 import '../../data/providers.dart';
 import '../../models/place.dart';
 import '../../models/visit_record.dart';
+import '../map/briefing_state.dart' show moveMapArea;
 import '../map/map_screen.dart' show mapPinsProvider;
 import '../place/place_detail_screen.dart';
 
@@ -91,6 +92,9 @@ class _RecordFormScreenState extends ConsumerState<RecordFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       return;
     }
+    // 지도로 돌아가면 방금 기록한 식당이 보이도록 (내 위치에서 먼 곳이어도)
+    final place = ref.read(placesProvider).valueOrNull?.where((p) => p.id == widget.placeId).firstOrNull;
+    if (place != null) moveMapArea(ref, place.location);
     ref.invalidate(placeRecordsProvider(widget.placeId));
     ref.invalidate(recommendProvider);
     ref.invalidate(placesProvider);

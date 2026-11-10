@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- B1. 입맛 다시는 얼굴 핀: 기분 좋게 감은 눈 + 활짝 웃는 입 + 입 가로 70% 지점에서 혀가 늘어진 모양 -->
+  <rect width="512" height="512" rx="112" fill="#F7F2EA"/>
+  <path d="M256 70c-88 0-152 64-152 150 0 106 120 196 145 214a12 12 0 0 0 14 0c25-18 145-108 145-214 0-86-64-150-152-150z" fill="#C2461A"/>
+  <circle cx="256" cy="222" r="96" fill="#FDFAF5"/>
+  <path d="M204 200q17-20 34 0" fill="none" stroke="#1F1A15" stroke-width="13" stroke-linecap="round"/>
+  <path d="M274 200q17-20 34 0" fill="none" stroke="#1F1A15" stroke-width="13" stroke-linecap="round"/>
+  <path d="M252.2 261.9 C251.0 293.7 265.2 294.5 286.6 294.5 C308.0 294.5 301.0 274.0 299.8 242.1 Z" fill="#E8735A"/><path d="M252.2 261.9 C251.0 293.7 265.2 294.5 286.6 294.5 C308.0 294.5 301.0 274.0 299.8 242.1" fill="none" stroke="#1F1A15" stroke-width="10.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M278.1 259.5 L281.8 278.6" fill="none" stroke="#B9452F" stroke-width="6.2" stroke-linecap="round"/><path d="M206 236 Q256.0 288 306 236" fill="none" stroke="#1F1A15" stroke-width="13" stroke-linecap="round"/>
+</svg>

@@ -9,6 +9,8 @@ from .. import areas, llm, store
 from ..schemas import Briefing, BriefingSentence, Record, ScoredPlace
 from .recommend import scored_for
 
+from ..auth import CurrentUser
+
 router = APIRouter(prefix="/briefing", tags=["briefing"])
 
 TOP_PLACES = 3
@@ -56,7 +58,7 @@ _SCHEMA = {
 
 
 @router.get("")
-def briefing(area: str) -> Briefing:
+def briefing(me_id: CurrentUser, area: str) -> Briefing:
     """상권 또는 행정동 안 친구 기록을 모아 점수 상위 식당을 자연어로 요약한다.
 
     - 상권: 식당 좌표로 정한 소속(반경 안 가장 가까운 상권, areas.area_of)
@@ -65,7 +67,7 @@ def briefing(area: str) -> Briefing:
     if area not in areas.BY_NAME and not _DONG_NAME.match(area):
         raise HTTPException(404, "지원하지 않는 지역입니다. GET /areas로 주변 상권을 확인해 주세요")
     in_area = {p.id for p in store.places_in(area)}
-    me = store.users[store.ME_ID]
+    me = store.users[me_id]
     friend_ids = store.follows.get(me.id, set())
     friend_records = [
         r for r in store.visible_records(me.id)

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/router.dart';
+import '../../core/auth.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/providers.dart';
 import '../../models/taste_vector.dart';
 
@@ -48,7 +49,7 @@ class _BalanceGameScreenState extends ConsumerState<BalanceGameScreen> {
     ref.invalidate(meProvider);
     ref.invalidate(recommendProvider);
     // router의 redirect가 지도 화면으로 보낸다.
-    ref.read(onboardedProvider.notifier).state = true;
+    ref.read(authProvider.notifier).markOnboarded();
   }
 
   @override
@@ -63,7 +64,7 @@ class _BalanceGameScreenState extends ConsumerState<BalanceGameScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(children: [
-                Text('먹로그', style: text.titleMedium),
+                const BrandLogo(size: 24),
                 const Spacer(),
                 Text('${_step + 1} / ${_questions.length}',
                     style: text.bodyMedium!.copyWith(fontFeatures: tabular)),

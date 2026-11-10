@@ -34,15 +34,13 @@ class HomeShell extends StatelessWidget {
             leading: Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 24),
               child: Column(children: [
-                Text('먹로그', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 16),
-                FloatingActionButton.small(
-                  heroTag: 'record',
-                  tooltip: '다녀왔어요',
-                  elevation: 0,
-                  onPressed: () => context.push('/record/search'),
-                  child: const Icon(Icons.edit_outlined, size: 18),
-                ),
+                const BrandLogo(size: 36, showName: false),
+                const SizedBox(height: 6),
+                const Wordmark(size: 15),
+                const SizedBox(height: 20),
+                const _RailRecordButton(),
+                const SizedBox(height: 12),
+                const SizedBox(width: 48, child: Divider(height: 1)),
               ]),
             ),
             destinations: [
@@ -64,6 +62,59 @@ class HomeShell extends StatelessWidget {
         destinations: [
           for (final (icon, label) in _items) NavigationDestination(icon: Icon(icon), label: label),
         ],
+      ),
+    );
+  }
+}
+
+/// 넓은 화면 왼쪽 내비게이션의 "기록하기" 버튼. 앱에서 가장 중요한 행동이라 강조색을 쓴다.
+class _RailRecordButton extends StatefulWidget {
+  const _RailRecordButton();
+
+  @override
+  State<_RailRecordButton> createState() => _RailRecordButtonState();
+}
+
+class _RailRecordButtonState extends State<_RailRecordButton> {
+  var _hover = false;
+  var _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Tooltip(
+      message: '다녀온 곳 기록하기',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTap: () => context.push('/record/search'),
+          child: AnimatedScale(
+            scale: _pressed ? 0.97 : 1,
+            duration: motionFast,
+            curve: motionCurve,
+            child: Column(children: [
+              AnimatedContainer(
+                duration: motionFast,
+                curve: motionCurve,
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: _hover ? const Color(0xFFAB3D16) : Palette.ember,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [BoxShadow(color: Color(0x261F1A15), blurRadius: 8, offset: Offset(0, 2))],
+                ),
+                child: const Icon(Icons.edit_outlined, size: 22, color: Colors.white),
+              ),
+              const SizedBox(height: 6),
+              Text('기록하기', style: text.labelMedium!.copyWith(color: Palette.ember)),
+            ]),
+          ),
+        ),
       ),
     );
   }

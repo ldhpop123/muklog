@@ -17,11 +17,34 @@ dependencies:
   google_fonts: ^6.2.1
   geolocator: ^14.1.2
   image_picker: ^1.2.4
+  shared_preferences: ^2.5.6
+  flutter_web_auth_2: ^5.1.0
+  crypto: ^3.0.8
+  kakao_flutter_sdk_user: ^1.9.7+3
+  google_sign_in: ^7.2.0
+  google_sign_in_web: ^1.1.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/mark.png
+
+# 앱 아이콘 (B1 입맛 다시는 얼굴 핀). 원본 SVG는 design/icons/. 바꾼 뒤 `dart run flutter_launcher_icons`
+flutter_launcher_icons:
+  image_path: "assets/brand/icon.png"
+  android: true
+  adaptive_icon_background: "#F7F2EA"
+  adaptive_icon_foreground: "assets/brand/icon-foreground.png"
+  ios: true
+  remove_alpha_ios: true
+  web:
+    generate: true
+    image_path: "assets/brand/icon.png"
+    background_color: "#F7F2EA"
+    theme_color: "#C2461A"

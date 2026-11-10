@@ -1,11 +1,11 @@
 {
-    "name": "muklog",
-    "short_name": "muklog",
+    "name": "Muklog",
+    "short_name": "Muklog",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F7F2EA",
+    "theme_color": "#C2461A",
+    "description": "친구가 다녀온 곳만 보여 주는 미식 지도",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

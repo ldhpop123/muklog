@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
-        android:label="먹로그"
+        android:label="Muklog"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -35,6 +35,29 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- 카카오 계정 로그인: 브라우저 인증 뒤 kakao{네이티브 앱 키}://oauth 로 앱에 돌아온다 (키는 빌드 시 .env에서) -->
+        <activity
+            android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kakao${KAKAO_NATIVE_APP_KEY}" android:host="oauth" />
+            </intent-filter>
+        </activity>
+        <!-- 네이버 로그인: 서버 콜백이 muklog://auth?login_code=… 로 돌려보내면 여기서 앱으로 돌아온다 (flutter_web_auth_2) -->
+        <activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true"
+            android:taskAffinity="">
+            <intent-filter android:label="flutter_web_auth_2">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="muklog" android:host="auth" />
+            </intent-filter>
+        </activity>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

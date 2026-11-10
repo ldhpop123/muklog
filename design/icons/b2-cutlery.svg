@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- B2. 포크·숟가락 든 얼굴 핀: 핀 양옆에 식기를 세워 "밥 먹으러 가자" -->
+  <rect width="512" height="512" rx="112" fill="#F7F2EA"/>
+  <!-- 포크 (왼쪽) -->
+  <g fill="#1F1A15">
+    <rect x="78" y="128" width="10" height="62" rx="5"/>
+    <rect x="98" y="128" width="10" height="62" rx="5"/>
+    <rect x="118" y="128" width="10" height="62" rx="5"/>
+    <path d="M78 184h50v14a25 25 0 0 1-17 24v178a8 8 0 0 1-16 0V222a25 25 0 0 1-17-24z"/>
+  </g>
+  <!-- 숟가락 (오른쪽) -->
+  <g fill="#1F1A15">
+    <ellipse cx="409" cy="166" rx="27" ry="40"/>
+    <path d="M401 196h16v204a8 8 0 0 1-16 0z"/>
+  </g>
+  <!-- 얼굴 핀 (가운데, 조금 작게) -->
+  <path d="M256 92c-76 0-132 56-132 130 0 92 104 170 125 186a12 12 0 0 0 14 0c21-16 125-94 125-186 0-74-56-130-132-130z" fill="#C2461A"/>
+  <circle cx="256" cy="222" r="82" fill="#FDFAF5"/>
+  <circle cx="227" cy="207" r="11" fill="#1F1A15"/>
+  <circle cx="285" cy="207" r="11" fill="#1F1A15"/>
+  <path d="M218 243c10 18 25 27 38 27s28-9 38-27" fill="none" stroke="#1F1A15" stroke-width="12" stroke-linecap="round"/>
+</svg>

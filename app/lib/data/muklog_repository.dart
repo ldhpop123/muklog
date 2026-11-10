@@ -1,3 +1,4 @@
+import '../models/auth.dart';
 import '../models/place.dart';
 import '../models/scored_place.dart';
 import '../models/social.dart';
@@ -11,6 +12,14 @@ export '../models/scored_place.dart';
 /// 목 구현([MockMuklogRepository])과 API 구현([ApiMuklogRepository])을 `AppConfig.useMock`으로 바꿔 끼운다.
 /// API 계약은 README "서버 (FastAPI)" 섹션의 엔드포인트 표를 따른다.
 abstract class MuklogRepository {
+  /// 소셜 로그인 SDK가 준 토큰(카카오·네이버: 액세스 토큰, 구글: ID 토큰)을 서버에서 검증하고 먹로그 세션을 받는다.
+  Future<AuthResult> login(SocialProvider provider, String providerToken);
+
+  /// 네이버 로그인: 서버 콜백이 돌려준 1회용 코드를, 시작할 때 만든 PKCE verifier와 함께 세션으로 바꾼다.
+  Future<AuthResult> exchangeLoginCode(String loginCode, String codeVerifier);
+
+  Future<void> logout();
+
   Future<UserProfile> me();
   Future<List<UserProfile>> friends();
 
@@ -54,8 +63,11 @@ abstract class MuklogRepository {
 
 /// 사용자에게 그대로 보여 줄 수 있는 메시지를 담은 오류.
 class MuklogException implements Exception {
-  const MuklogException(this.message);
+  const MuklogException(this.message, {this.statusCode});
   final String message;
+
+  /// 서버 응답 코드 (401이면 세션 만료로 보고 로그인 화면으로 보낸다)
+  final int? statusCode;
 
   @override
   String toString() => message;

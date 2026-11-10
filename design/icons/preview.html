@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>먹로그 아이콘 시안</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 48px; background: #F7F2EA; color: #1F1A15;
+         font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+  h1 { font-size: 24px; font-weight: 500; margin: 0 0 4px; }
+  .sub { color: #5E544A; font-size: 14px; margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1100px; }
+  .card { background: #FDFAF5; border: 1px solid rgba(31,26,21,.08); border-radius: 16px; padding: 24px; }
+  .label { font-size: 13px; color: #C2461A; font-weight: 500; }
+  .name { font-size: 18px; font-weight: 500; margin: 2px 0 6px; }
+  .desc { font-size: 14px; color: #5E544A; line-height: 22px; margin: 0 0 20px; min-height: 66px; }
+  .big { width: 160px; height: 160px; display: block; margin: 0 auto 20px;
+         filter: drop-shadow(0 4px 12px rgba(31,26,21,.12)); }
+  .row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .row img { filter: drop-shadow(0 1px 3px rgba(31,26,21,.15)); }
+  .home { margin-top: 20px; border-radius: 12px; padding: 14px 0 10px;
+          background: linear-gradient(#5b6b7a, #3c4752); }
+  .home .row span { display: block; color: #fff; font-size: 11px; text-align: center; margin-top: 4px; }
+  .home .app { display: flex; flex-direction: column; align-items: center; }
+  .ghost { width: 48px; height: 48px; border-radius: 11px; background: rgba(255,255,255,.25); }
+</style>
+</head>
+<body>
+  <h1>얼굴 핀 변형 3개</h1>
+  <p class="sub">고르신 B(얼굴 핀)를 바탕으로 혀와 식기를 더했어요. 큰 그림, 작은 크기, 홈 화면 순서예요</p>
+  <div class="grid">
+    <div class="card">
+      <div class="label">B1</div>
+      <div class="name">입맛 다시는 얼굴 핀</div>
+      <p class="desc">기분 좋게 눈을 감고, 입 가로 70% 지점에서 혀가 살짝 늘어진 얼굴. 식기 없이도 "맛있겠다"가 바로 읽히고, 작은 크기에서 가장 깔끔해요</p>
+      <img class="big" src="b1-tongue.svg" alt="">
+      <div class="row"><img src="b1-tongue.svg" width="64"><img src="b1-tongue.svg" width="40"><img src="b1-tongue.svg" width="24"></div>
+      <div class="home"><div class="row">
+        <div class="app"><div class="ghost"></div><span>지도</span></div>
+        <div class="app"><img src="b1-tongue.svg" width="48"><span>먹로그</span></div>
+        <div class="app"><div class="ghost"></div><span>카메라</span></div>
+      </div></div>
+    </div>
+    <div class="card">
+      <div class="label">B2</div>
+      <div class="name">포크·숟가락 든 얼굴 핀</div>
+      <p class="desc">핀 양옆에 포크와 숟가락을 세웠어요. 음식 앱이라는 게 가장 직접적으로 보이지만, 작은 크기에서는 식기가 가늘어져요</p>
+      <img class="big" src="b2-cutlery.svg" alt="">
+      <div class="row"><img src="b2-cutlery.svg" width="64"><img src="b2-cutlery.svg" width="40"><img src="b2-cutlery.svg" width="24"></div>
+      <div class="home"><div class="row">
+        <div class="app"><div class="ghost"></div><span>지도</span></div>
+        <div class="app"><img src="b2-cutlery.svg" width="48"><span>먹로그</span></div>
+        <div class="app"><div class="ghost"></div><span>카메라</span></div>
+      </div></div>
+    </div>
+    <div class="card">
+      <div class="label">B3</div>
+      <div class="name">혀 + 식기</div>
+      <p class="desc">핀 뒤로 포크와 숟가락을 X자로 걸치고, 얼굴은 혀를 내밀어 입맛을 다셔요. 둘을 다 담아 가장 "먹을 거야" 느낌이 강해요</p>
+      <img class="big" src="b3-tongue-cutlery.svg" alt="">
+      <div class="row"><img src="b3-tongue-cutlery.svg" width="64"><img src="b3-tongue-cutlery.svg" width="40"><img src="b3-tongue-cutlery.svg" width="24"></div>
+      <div class="home"><div class="row">
+        <div class="app"><div class="ghost"></div><span>지도</span></div>
+        <div class="app"><img src="b3-tongue-cutlery.svg" width="48"><span>먹로그</span></div>
+        <div class="app"><div class="ghost"></div><span>카메라</span></div>
+      </div></div>
+    </div>
+  </div>
+</body>
+</html>

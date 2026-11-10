@@ -14,6 +14,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ..schemas import UploadOut
 
+from ..auth import CurrentUser
+
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 UPLOAD_DIR = Path(os.getenv("MUKLOG_UPLOAD_DIR", Path(__file__).resolve().parents[2] / "uploads"))
@@ -106,7 +108,7 @@ def uploaded_exists(url: str) -> bool:
 
 
 @router.post("", status_code=201)
-async def upload(file: UploadFile) -> UploadOut:
+async def upload(me_id: CurrentUser, file: UploadFile) -> UploadOut:
     """이미지 1장을 받아 저장하고 URL을 돌려준다. jpg·png·webp·heic, 10MB 이하."""
     head = await file.read(16)
     kind = detect_image(head)
